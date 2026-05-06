@@ -14,19 +14,19 @@ const SLIDE_TYPES = [
 ];
 
 const AI_MODELS = [
-  { dot: "#8B5CF6", name: "Claude Haiku 4.5",  role: "MVD analysis + QC primario",     tag: "Anthropic" },
-  { dot: "#0EA5E9", name: "Gemini 2.5 Flash",  role: "Generazione 7 slide in parallelo", tag: "Google"    },
-  { dot: "#A855F7", name: "Claude Opus 4.7",   role: "QC escalation (score < 65)",       tag: "Anthropic" },
-  { dot: "#22C55E", name: "GPT-Image-2",        role: "Fallback prodotti con testo",      tag: "OpenAI"    },
+  { dot: "#A78BFA", name: "Claude Haiku 4.5",  role: "MVD analysis + QC primario",       tag: "Anthropic" },
+  { dot: "#38BDF8", name: "Gemini 2.5 Flash",  role: "Generazione 7 slide in parallelo", tag: "Google"    },
+  { dot: "#C084FC", name: "Claude Opus 4.7",   role: "QC escalation (score < 65)",        tag: "Anthropic" },
+  { dot: "#34D399", name: "GPT-Image-2",        role: "Fallback prodotti con testo",       tag: "OpenAI"    },
 ];
 
 const SETUP_KEYS = [
-  { key: "ANTHROPIC_API_KEY",         service: "Anthropic",       desc: "MVD + QC",               color: "#8B5CF6" },
-  { key: "GOOGLE_AI_API_KEY",         service: "Google AI Studio", desc: "Generazione immagini",   color: "#0EA5E9" },
-  { key: "OPENAI_API_KEY",            service: "OpenAI",           desc: "GPT-Image-2 fallback",   color: "#22C55E" },
-  { key: "RAINFOREST_API_KEY",        service: "Rainforest API",   desc: "Amazon scraping",        color: "#F59E0B" },
-  { key: "CLOUDFLARE_R2_*",           service: "Cloudflare R2",    desc: "Storage (egress gratis)", color: "#F97316" },
-  { key: "NEXT_PUBLIC_SUPABASE_URL",  service: "Supabase",         desc: "DB jobs + cache ASIN",   color: "#10B981" },
+  { key: "ANTHROPIC_API_KEY",         service: "Anthropic",        desc: "MVD + QC",               color: "#A78BFA" },
+  { key: "GOOGLE_AI_API_KEY",         service: "Google AI Studio", desc: "Generazione immagini",   color: "#38BDF8" },
+  { key: "OPENAI_API_KEY",            service: "OpenAI",           desc: "GPT-Image-2 fallback",   color: "#34D399" },
+  { key: "RAINFOREST_API_KEY",        service: "Rainforest API",   desc: "Amazon scraping",        color: "#FCD34D" },
+  { key: "CLOUDFLARE_R2_*",           service: "Cloudflare R2",    desc: "Storage (egress gratis)", color: "#FB923C" },
+  { key: "NEXT_PUBLIC_SUPABASE_URL",  service: "Supabase",         desc: "DB jobs + cache ASIN",   color: "#4ADE80" },
 ];
 
 export default function HomePage() {
@@ -210,33 +210,56 @@ export default function HomePage() {
 
       {/* ── 7 Slide Templates ──────────────────────────────────── */}
       <div className="mb-8">
-        <SectionHeader title="7 Template Slide" badge="parallele" />
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="mb-4"><SectionHeader title="7 Template Slide" badge="parallele" /></div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {SLIDE_TYPES.map((s, idx) => {
             const hue = SLIDE_COLORS[idx % SLIDE_COLORS.length];
+            const [r, g, b] = hexToRgbArr(hue);
             return (
-              <div key={s.num} className="card p-4 flex flex-col gap-2 transition-all">
+              <div
+                key={s.num}
+                className="relative overflow-hidden rounded-xl p-4 flex flex-col gap-2 transition-all"
+                style={{
+                  background: `linear-gradient(145deg, rgba(${r},${g},${b},0.10) 0%, #13132A 60%)`,
+                  border: `1px solid rgba(${r},${g},${b},0.40)`,
+                  borderTop: `2px solid ${hue}`,
+                }}
+              >
+                {/* corner glow */}
+                <div className="absolute -top-4 -right-4 w-14 h-14 rounded-full pointer-events-none"
+                  style={{ background: `rgba(${r},${g},${b},0.18)`, filter: "blur(12px)" }} />
+
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-black font-mono" style={{ color: hue }}>
+                  <span
+                    className="text-base font-black font-mono"
+                    style={{ color: hue, textShadow: `0 0 10px rgba(${r},${g},${b},0.6)` }}
+                  >
                     {s.num}
                   </span>
-                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                  <span className="text-xs sm:text-sm font-bold" style={{ color: "var(--text-primary)" }}>
                     {s.name}
                   </span>
                 </div>
-                <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                <p className="text-xs leading-relaxed" style={{ color: "#A0A0C0" }}>
                   {s.desc}
                 </p>
-                <div className="mt-auto pt-2">
-                  <div className="h-0.5 rounded-full w-8" style={{ background: hue, opacity: 0.5 }} />
+                <div className="mt-auto pt-1">
+                  <div className="h-[2px] rounded-full"
+                    style={{ background: `linear-gradient(90deg, ${hue}, transparent)`, width: "60%" }} />
                 </div>
               </div>
             );
           })}
-          <div className="card p-4 flex flex-col items-center justify-center gap-2 opacity-35"
-            style={{ borderStyle: "dashed" }}>
-            <span className="text-xl font-light" style={{ color: "var(--text-muted)" }}>+</span>
-            <span className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
+          {/* Placeholder */}
+          <div
+            className="rounded-xl p-4 flex flex-col items-center justify-center gap-2"
+            style={{
+              border: "1px dashed rgba(255,255,255,0.12)",
+              background: "rgba(255,255,255,0.02)",
+            }}
+          >
+            <span className="text-2xl font-light" style={{ color: "rgba(255,255,255,0.25)" }}>+</span>
+            <span className="text-xs text-center" style={{ color: "rgba(255,255,255,0.3)" }}>
               Custom slide<br />in roadmap
             </span>
           </div>
@@ -328,7 +351,13 @@ export default function HomePage() {
   );
 }
 
-const SLIDE_COLORS = ["#8B5CF6", "#0EA5E9", "#EC4899", "#10B981", "#F59E0B", "#F97316", "#A855F7"];
+const SLIDE_COLORS = ["#A78BFA", "#38BDF8", "#F472B6", "#34D399", "#FCD34D", "#FB923C", "#C084FC"];
+
+function hexToRgbArr(hex: string): [number, number, number] {
+  const clean = hex.replace("#", "");
+  if (clean.length !== 6) return [139, 92, 246];
+  return [parseInt(clean.slice(0,2),16), parseInt(clean.slice(2,4),16), parseInt(clean.slice(4,6),16)];
+}
 
 function SectionHeader({ title, badge }: { title: string; badge?: string }) {
   return (
