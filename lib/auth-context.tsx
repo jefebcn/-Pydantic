@@ -35,14 +35,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    supabaseBrowser.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
+    supabaseBrowser.auth
+      .getSession()
+      .then(({ data }) => {
+        setUser(data.session?.user ?? null);
+      })
+      .catch(() => { /* no Supabase URL configured yet */ })
+      .finally(() => setLoading(false));
 
-    const { data: { subscription } } = supabaseBrowser.auth.onAuthStateChange((_, s) => {
-      setUser(s?.user ?? null);
-    });
+    let subscription: { unsubscribe: () => void } = { unsubscribe: () => {} };
+    try {
+      const { data } = supabaseBrowser.auth.onAuthStateChange((_, s) => {
+        setUser(s?.user ?? null);
+      });
+      subscription = data.subscription;
+    } catch { /* no-op */ }
     return () => subscription.unsubscribe();
   }, []);
 

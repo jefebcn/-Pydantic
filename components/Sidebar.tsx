@@ -95,50 +95,73 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Auth section */}
+      {/* Auth section — always visible */}
       <div className="px-4 py-4 border-t" style={{ borderColor: "var(--border)" }}>
-        {!loading && user ? (
-          /* Logged in */
+        {user ? (
+          /* ── Logged in ── */
           <div>
             <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-2"
-              style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.2)" }}>
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0"
+              style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0"
                 style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}>
                 {initials}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-                  {user.user_metadata?.display_name ?? user.email?.split("@")[0]}
+                  {(user.user_metadata?.display_name as string) ?? user.email?.split("@")[0]}
                 </p>
                 <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>
                   {user.email}
                 </p>
               </div>
             </div>
-            <button onClick={() => signOut()}
-              className="w-full text-xs py-1.5 rounded-lg transition-all"
-              style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
-              Esci
+            <button
+              onClick={() => signOut()}
+              className="w-full text-xs py-1.5 rounded-lg font-medium transition-all"
+              style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = "#F87171"; e.currentTarget.style.borderColor = "rgba(248,113,113,0.3)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.borderColor = "var(--border)"; }}
+            >
+              Esci dall&apos;account
             </button>
           </div>
-        ) : !loading ? (
-          /* Not logged in */
+        ) : (
+          /* ── Guest / loading ── */
           <div className="flex flex-col gap-2">
-            <p className="text-xs px-1 mb-1" style={{ color: "var(--text-muted)" }}>
-              Accedi per sync cross-device
+            <p className="text-[11px] px-1 font-medium mb-0.5" style={{ color: "var(--text-muted)" }}>
+              Account
             </p>
-            <button onClick={openLogin}
-              className="w-full text-xs py-2 rounded-lg font-semibold transition-all"
-              style={{ background: "rgba(139,92,246,0.18)", color: "var(--purple-400)", border: "1px solid rgba(139,92,246,0.3)" }}>
-              Accedi
+            <button
+              onClick={openLogin}
+              disabled={loading}
+              className="w-full text-xs py-2 rounded-lg font-bold transition-all"
+              style={{
+                background: "rgba(139,92,246,0.18)",
+                color: loading ? "var(--text-muted)" : "var(--purple-400)",
+                border: "1px solid rgba(139,92,246,0.3)",
+                opacity: loading ? 0.6 : 1,
+              }}
+            >
+              {loading ? "Caricamento…" : "Accedi"}
             </button>
-            <button onClick={openRegister}
+            <button
+              onClick={openRegister}
+              disabled={loading}
               className="w-full text-xs py-2 rounded-lg font-medium transition-all"
-              style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
+              style={{
+                color: "var(--text-muted)",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid var(--border)",
+                opacity: loading ? 0.6 : 1,
+              }}
+            >
               Registrati gratis
             </button>
+            <p className="text-[10px] text-center px-1" style={{ color: "var(--text-muted)", opacity: 0.7 }}>
+              Sync cronologia su ogni dispositivo
+            </p>
           </div>
-        ) : null}
+        )}
       </div>
 
       {/* Version */}
