@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import type { Job } from "@/lib/types";
+import { useAuth } from "@/lib/auth-context";
 
 const PAGE_LABELS: Record<string, string> = {
   "/":        "Dashboard",
@@ -41,6 +42,10 @@ const API_KEYS = [
 export default function TopBar() {
   const [query, setQuery]         = useState("");
   const [openPanel, setOpenPanel] = useState<"bell" | "settings" | null>(null);
+  const { user } = useAuth();
+  const initials = user?.user_metadata?.display_name
+    ? (user.user_metadata.display_name as string).slice(0, 2).toUpperCase()
+    : user?.email?.slice(0, 2).toUpperCase() ?? "AI";
   const [recentJobs, setRecentJobs] = useState<Job[]>([]);
   const [activeCount, setActiveCount] = useState(0);
   const pathname = usePathname();
@@ -275,10 +280,10 @@ export default function TopBar() {
             className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white"
             style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
           >
-            AI
+            {initials}
           </div>
           <span className="text-xs font-semibold hidden sm:block" style={{ color: "var(--purple-400)" }}>
-            Pro
+            {user ? (user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "Account") : "Guest"}
           </span>
         </div>
       </div>

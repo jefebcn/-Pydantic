@@ -1,6 +1,9 @@
 "use client";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/lib/auth-context";
+import AuthModal from "@/components/AuthModal";
 
 const navItems = [
   {
@@ -20,6 +23,16 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user, signOut, loading } = useAuth();
+  const [authOpen, setAuthOpen]   = useState(false);
+  const [authTab, setAuthTab]     = useState<"login" | "register">("login");
+
+  const openLogin    = () => { setAuthTab("login");    setAuthOpen(true); };
+  const openRegister = () => { setAuthTab("register"); setAuthOpen(true); };
+
+  const initials = user?.user_metadata?.display_name
+    ? (user.user_metadata.display_name as string).slice(0, 2).toUpperCase()
+    : user?.email?.slice(0, 2).toUpperCase() ?? "??";
 
   return (
     <aside
@@ -82,15 +95,61 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Version badge */}
-      <div className="px-5 py-4 border-t" style={{ borderColor: "var(--border)" }}>
-        <div
-          className="rounded-lg px-3 py-2 text-xs text-center"
-          style={{ background: "rgba(139,92,246,0.1)", color: "var(--purple-400)" }}
-        >
+      {/* Auth section */}
+      <div className="px-4 py-4 border-t" style={{ borderColor: "var(--border)" }}>
+        {!loading && user ? (
+          /* Logged in */
+          <div>
+            <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-2"
+              style={{ background: "rgba(139,92,246,0.1)", border: "1px solid rgba(139,92,246,0.2)" }}>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0"
+                style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}>
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+                  {user.user_metadata?.display_name ?? user.email?.split("@")[0]}
+                </p>
+                <p className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>
+                  {user.email}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => signOut()}
+              className="w-full text-xs py-1.5 rounded-lg transition-all"
+              style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
+              Esci
+            </button>
+          </div>
+        ) : !loading ? (
+          /* Not logged in */
+          <div className="flex flex-col gap-2">
+            <p className="text-xs px-1 mb-1" style={{ color: "var(--text-muted)" }}>
+              Accedi per sync cross-device
+            </p>
+            <button onClick={openLogin}
+              className="w-full text-xs py-2 rounded-lg font-semibold transition-all"
+              style={{ background: "rgba(139,92,246,0.18)", color: "var(--purple-400)", border: "1px solid rgba(139,92,246,0.3)" }}>
+              Accedi
+            </button>
+            <button onClick={openRegister}
+              className="w-full text-xs py-2 rounded-lg font-medium transition-all"
+              style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
+              Registrati gratis
+            </button>
+          </div>
+        ) : null}
+      </div>
+
+      {/* Version */}
+      <div className="px-5 pb-4">
+        <div className="rounded-lg px-3 py-1.5 text-xs text-center"
+          style={{ background: "rgba(139,92,246,0.08)", color: "var(--text-muted)" }}>
           v0.1.0 — Preview
         </div>
       </div>
+
+      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} defaultTab={authTab} />
     </aside>
   );
 }

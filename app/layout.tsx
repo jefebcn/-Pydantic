@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk, DM_Sans, DM_Mono } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
+import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -38,13 +39,15 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex" style={{ background: "var(--bg-base)" }}>
-        <Sidebar />
-        <div className="flex-1 min-h-screen overflow-y-auto flex flex-col">
-          <TopBar />
-          <div className="flex-1">
-            {children}
+        <AuthProvider>
+          <Sidebar />
+          <div className="flex-1 min-h-screen overflow-y-auto flex flex-col">
+            <TopBar />
+            <div className="flex-1">
+              {children}
+            </div>
           </div>
-        </div>
+        </AuthProvider>
       </body>
     </html>
   );
