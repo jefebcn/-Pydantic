@@ -1,26 +1,114 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg-base:        #0B0B18;
+  --bg-sidebar:     #10101F;
+  --bg-card:        #15152A;
+  --bg-card-hover:  #1C1C35;
+  --border:         #252540;
+  --border-purple:  rgba(139, 92, 246, 0.3);
+  --purple-600:     #7C3AED;
+  --purple-500:     #8B5CF6;
+  --purple-400:     #A78BFA;
+  --pink-500:       #EC4899;
+  --text-primary:   #F0F0FF;
+  --text-muted:     #6B6B8A;
+  --glow-purple:    0 0 40px rgba(139, 92, 246, 0.15);
+  --glow-purple-btn: 0 0 20px rgba(139, 92, 246, 0.4);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--bg-base);
+  --color-foreground: var(--text-primary);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-base); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--purple-600); }
+
+/* Utility classes */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  transition: border-color 0.2s;
+}
+.card:hover {
+  border-color: var(--border-purple);
+}
+
+.card-hero {
+  background: linear-gradient(135deg, rgba(124, 58, 237, 0.25) 0%, rgba(236, 72, 153, 0.1) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 1rem;
+  box-shadow: var(--glow-purple);
+}
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--purple-400), var(--pink-500));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--purple-600), var(--purple-500));
+  color: white;
+  font-weight: 600;
+  border-radius: 0.75rem;
+  padding: 0.75rem 1.5rem;
+  box-shadow: var(--glow-purple-btn);
+  transition: all 0.2s;
+  border: none;
+  cursor: pointer;
+}
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--purple-500), var(--purple-400));
+  box-shadow: 0 0 30px rgba(139, 92, 246, 0.5);
+  transform: translateY(-1px);
+}
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Pulse animation for active pipeline step */
+@keyframes pulse-purple {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
+  50%       { box-shadow: 0 0 0 8px rgba(139, 92, 246, 0); }
+}
+.pulse-purple {
+  animation: pulse-purple 2s infinite;
+}
+
+/* Shimmer for progress bar */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.progress-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--purple-600) 0%,
+    var(--purple-400) 40%,
+    var(--purple-600) 100%
+  );
+  background-size: 200% auto;
+  animation: shimmer 2s linear infinite;
 }
