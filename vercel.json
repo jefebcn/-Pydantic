@@ -5,11 +5,9 @@
   "installCommand": "npm install && pip install -r requirements.txt",
   "functions": {
     "api/generate.py": {
-      "runtime": "@vercel/python",
       "maxDuration": 120
     },
     "api/status.py": {
-      "runtime": "@vercel/python",
       "maxDuration": 10
     }
   },
