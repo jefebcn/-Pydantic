@@ -4,29 +4,29 @@ import { useRouter } from "next/navigation";
 import StatCard from "@/components/StatCard";
 
 const SLIDE_TYPES = [
-  { num: "01", name: "Hero", desc: "Prodotto su sfondo neutro con illuminazione drammatica. Occupa il 55% del frame." },
-  { num: "02", name: "Problem / Solution", desc: "Split 50/50: problema a sinistra (desaturato), soluzione a destra (vivo)." },
-  { num: "03", name: "Key Features", desc: "Vista pulita con 3 settori vuoti per callout in compositing." },
-  { num: "04", name: "Lifestyle", desc: "Prodotto nel contesto d'uso, bokeh creamy, luce naturale." },
-  { num: "05", name: "Tech Specs", desc: "Vista blueprint: illuminazione piatta, spazio per dimensioni." },
-  { num: "06", name: "Social Proof", desc: "Prodotto in accent, ampio spazio per rating e recensioni." },
-  { num: "07", name: "Why Us", desc: "Prodotto in alto come trofeo, spazio per tabella comparativa." },
+  { num: "01", name: "Hero",             desc: "Prodotto su sfondo neutro, illuminazione drammatica tre-point." },
+  { num: "02", name: "Problem / Solution", desc: "Split 50/50: problema desaturato a sx, soluzione vivida a dx." },
+  { num: "03", name: "Key Features",     desc: "Vista pulita con 3 settori vuoti per callout in compositing." },
+  { num: "04", name: "Lifestyle",        desc: "Prodotto nel contesto d'uso, bokeh creamy, luce naturale." },
+  { num: "05", name: "Tech Specs",       desc: "Blueprint: illuminazione piatta, spazio per dimensioni." },
+  { num: "06", name: "Social Proof",     desc: "Accent piccolo, ampio spazio per rating e recensioni." },
+  { num: "07", name: "Why Us",           desc: "Prodotto trofeo in alto, spazio per tabella comparativa." },
 ];
 
 const AI_MODELS = [
-  { dot: "#7C3AED", name: "Claude Haiku 4.5", role: "MVD + QC primario", tag: "Anthropic" },
-  { dot: "#0EA5E9", name: "Gemini 2.5 Flash", role: "Generazione 7 slide", tag: "Google" },
-  { dot: "#8B5CF6", name: "Claude Opus 4.7", role: "QC escalation (score < 65)", tag: "Anthropic" },
-  { dot: "#22C55E", name: "GPT-Image-2", role: "Fallback prodotti con testo", tag: "OpenAI" },
+  { dot: "#8B5CF6", name: "Claude Haiku 4.5",  role: "MVD analysis + QC primario",     tag: "Anthropic" },
+  { dot: "#0EA5E9", name: "Gemini 2.5 Flash",  role: "Generazione 7 slide in parallelo", tag: "Google"    },
+  { dot: "#A855F7", name: "Claude Opus 4.7",   role: "QC escalation (score < 65)",       tag: "Anthropic" },
+  { dot: "#22C55E", name: "GPT-Image-2",        role: "Fallback prodotti con testo",      tag: "OpenAI"    },
 ];
 
 const SETUP_KEYS = [
-  { key: "ANTHROPIC_API_KEY", service: "Anthropic", desc: "MVD analysis + QC" },
-  { key: "GOOGLE_AI_API_KEY", service: "Google AI Studio", desc: "Gemini image generation" },
-  { key: "OPENAI_API_KEY", service: "OpenAI", desc: "GPT-Image-2 fallback" },
-  { key: "RAINFOREST_API_KEY", service: "Rainforest API", desc: "Amazon scraping anti-bot" },
-  { key: "CLOUDFLARE_R2_*", service: "Cloudflare R2", desc: "Storage immagini (egress gratis)" },
-  { key: "NEXT_PUBLIC_SUPABASE_URL", service: "Supabase", desc: "DB jobs + cache ASIN" },
+  { key: "ANTHROPIC_API_KEY",         service: "Anthropic",       desc: "MVD + QC",               color: "#8B5CF6" },
+  { key: "GOOGLE_AI_API_KEY",         service: "Google AI Studio", desc: "Generazione immagini",   color: "#0EA5E9" },
+  { key: "OPENAI_API_KEY",            service: "OpenAI",           desc: "GPT-Image-2 fallback",   color: "#22C55E" },
+  { key: "RAINFOREST_API_KEY",        service: "Rainforest API",   desc: "Amazon scraping",        color: "#F59E0B" },
+  { key: "CLOUDFLARE_R2_*",           service: "Cloudflare R2",    desc: "Storage (egress gratis)", color: "#F97316" },
+  { key: "NEXT_PUBLIC_SUPABASE_URL",  service: "Supabase",         desc: "DB jobs + cache ASIN",   color: "#10B981" },
 ];
 
 export default function HomePage() {
@@ -62,64 +62,54 @@ export default function HomePage() {
   return (
     <div className="p-6 md:p-10 max-w-5xl mx-auto">
 
-      {/* Header */}
-      <div className="mb-8">
-        <p className="text-sm font-medium mb-1" style={{ color: "var(--purple-400)" }}>
+      {/* ── Header ─────────────────────────────────────────────── */}
+      <div className="mb-6">
+        <p className="text-xs font-semibold tracking-widest uppercase mb-1"
+          style={{ color: "var(--purple-400)" }}>
           Dashboard
         </p>
         <h1 className="text-3xl md:text-4xl font-bold" style={{ color: "var(--text-primary)" }}>
-          Ciao!{" "}
-          <span className="gradient-text">Cosa vuoi generare?</span>
+          Hi,{" "}
+          <span className="gradient-text">cosa vuoi generare?</span>
         </h1>
         <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
-          Inserisci un ASIN Amazon e ottieni 7 slide infografiche professionali in ~90 secondi.
+          Inserisci un ASIN Amazon — 7 slide infografiche professionali in ~90 secondi.
         </p>
       </div>
 
-      {/* Hero input card */}
-      <div id="generate" className="card-hero p-8 mb-8">
-        <div className="flex flex-col md:flex-row gap-6 items-start md:items-end">
-          <div className="flex-1">
-            <label
-              className="block text-sm font-semibold mb-2"
-              style={{ color: "var(--text-primary)" }}
-            >
+      {/* ── Hero 2-column ──────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
+
+        {/* Input card — 3 cols */}
+        <div id="generate" className="card-hero p-6 md:col-span-3 flex flex-col justify-between gap-6">
+          <div>
+            <label className="block text-sm font-semibold mb-1"
+              style={{ color: "var(--text-primary)" }}>
               ASIN Amazon
             </label>
             <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
-              Trovi l&apos;ASIN nell&apos;URL del prodotto o nella sezione &quot;Informazioni prodotto&quot;
+              Trovi l&apos;ASIN nell&apos;URL del prodotto o in &quot;Informazioni prodotto&quot;
             </p>
             <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 relative">
                 <input
                   type="text"
                   value={asin}
-                  onChange={(e) => {
-                    setAsin(e.target.value.toUpperCase());
-                    setError("");
-                  }}
+                  onChange={(e) => { setAsin(e.target.value.toUpperCase()); setError(""); }}
                   placeholder="Es. B08N5WRWNW"
                   maxLength={10}
                   className="w-full px-4 py-3 rounded-xl font-mono text-base tracking-widest outline-none transition-all"
                   style={{
                     background: "rgba(11,11,24,0.6)",
-                    border: error
-                      ? "1px solid rgba(239,68,68,0.5)"
-                      : "1px solid rgba(139,92,246,0.3)",
+                    border: error ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(139,92,246,0.3)",
                     color: "var(--text-primary)",
                     boxShadow: error ? "0 0 0 3px rgba(239,68,68,0.1)" : "none",
                   }}
-                  onFocus={(e) => {
-                    if (!error) e.currentTarget.style.boxShadow = "0 0 0 3px rgba(139,92,246,0.2)";
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.boxShadow = "none";
-                  }}
+                  onFocus={(e) => { if (!error) e.currentTarget.style.boxShadow = "0 0 0 3px rgba(139,92,246,0.2)"; }}
+                  onBlur={(e)  => { e.currentTarget.style.boxShadow = "none"; }}
                 />
-                <span
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono"
-                  style={{ color: asin.length === 10 ? "var(--purple-400)" : "var(--text-muted)" }}
-                >
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono"
+                  style={{ color: asin.length === 10 ? "var(--purple-400)" : "var(--text-muted)" }}>
                   {asin.length}/10
                 </span>
               </div>
@@ -129,143 +119,149 @@ export default function HomePage() {
                 className="btn-primary whitespace-nowrap"
               >
                 {loading ? (
-                  <span className="flex items-center gap-2">
-                    <SpinnerIcon />
-                    Avvio pipeline...
-                  </span>
+                  <span className="flex items-center gap-2"><SpinnerIcon />Avvio...</span>
                 ) : (
-                  <span className="flex items-center gap-2">
-                    <SparkleIcon />
-                    Genera 7 Slide
-                  </span>
+                  <span className="flex items-center gap-2"><SparkleIcon />Genera 7 Slide</span>
                 )}
               </button>
             </form>
-            {error && (
-              <p className="mt-2 text-xs" style={{ color: "#f87171" }}>
-                ⚠ {error}
-              </p>
-            )}
+            {error && <p className="mt-2 text-xs" style={{ color: "#f87171" }}>⚠ {error}</p>}
           </div>
 
-          {/* Pipeline preview */}
-          <div
-            className="hidden md:flex flex-col gap-2 text-xs shrink-0"
-            style={{ color: "var(--text-muted)" }}
-          >
-            {[
-              ["1", "Scraping Amazon"],
-              ["2", "Analisi AI (MVD)"],
-              ["3", "Generazione immagini"],
-              ["4", "Quality Check"],
-              ["5", "Compositing"],
-              ["6", "Upload & Download"],
-            ].map(([n, label]) => (
-              <div key={n} className="flex items-center gap-2">
-                <span
-                  className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
-                  style={{ background: "rgba(139,92,246,0.2)", color: "var(--purple-400)" }}
-                >
-                  {n}
+          {/* Mini pipeline steps */}
+          <div className="flex flex-wrap gap-2">
+            {["Scraping", "MVD", "Genera", "QC", "Compositing", "Upload"].map((step, i) => (
+              <div key={step} className="flex items-center gap-1.5 text-xs"
+                style={{ color: "var(--text-muted)" }}>
+                <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                  style={{ background: "rgba(139,92,246,0.2)", color: "var(--purple-400)" }}>
+                  {i + 1}
                 </span>
-                {label}
+                {step}
               </div>
             ))}
           </div>
         </div>
+
+        {/* Hero visual card — 2 cols */}
+        <div className="md:col-span-2 rounded-2xl overflow-hidden relative flex flex-col items-center justify-center p-6 min-h-[220px]"
+          style={{
+            background: "linear-gradient(135deg, #1a0533 0%, #0d1a3a 50%, #0a1628 100%)",
+            border: "1px solid rgba(139,92,246,0.35)",
+            boxShadow: "0 0 60px rgba(139,92,246,0.12)",
+          }}>
+          {/* Glow dots */}
+          <div className="absolute top-4 right-4 w-2 h-2 rounded-full" style={{ background: "#8B5CF6", boxShadow: "0 0 8px #8B5CF6" }} />
+          <div className="absolute bottom-6 left-6 w-1.5 h-1.5 rounded-full" style={{ background: "#0EA5E9", boxShadow: "0 0 6px #0EA5E9" }} />
+          <div className="absolute top-1/3 left-4 w-1 h-1 rounded-full" style={{ background: "#EC4899", boxShadow: "0 0 5px #EC4899" }} />
+
+          {/* Blob */}
+          <div className="blob-float relative mb-4">
+            <div style={{
+              width: 120, height: 120, borderRadius: "60% 40% 70% 30% / 50% 60% 40% 50%",
+              background: "radial-gradient(circle at 35% 35%, #FF6B35 0%, #FF3CAC 45%, #7C3AED 80%)",
+              boxShadow: "0 0 60px rgba(236,72,153,0.4), 0 0 30px rgba(124,58,237,0.3)",
+              filter: "blur(1px)",
+            }} />
+            <div className="absolute inset-0" style={{
+              borderRadius: "60% 40% 70% 30% / 50% 60% 40% 50%",
+              background: "radial-gradient(circle at 70% 25%, rgba(255,255,255,0.2) 0%, transparent 50%)",
+            }} />
+          </div>
+
+          {/* Text */}
+          <p className="text-xl font-bold text-center" style={{ color: "var(--text-primary)" }}>
+            <span style={{ color: "#A78BFA" }}>7 Slide</span>{" "}
+            <span style={{ color: "#EC4899" }}>Professionali</span>
+          </p>
+          <p className="text-xs text-center mt-1" style={{ color: "var(--text-muted)" }}>
+            Generate con AI in meno di 90s
+          </p>
+        </div>
       </div>
 
-      {/* Stats row */}
+      {/* ── Stats ──────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         <StatCard
           icon={<SlideIcon />}
           value="—"
           label="Slide Generate"
           sub="Aggiungi le API keys per iniziare"
-          accent
+          color="#8B5CF6"
+          tag="Live"
         />
         <StatCard
           icon={<AsinIcon />}
           value="—"
           label="ASIN Processati"
           sub="Cache attiva dopo il primo job"
+          color="#0EA5E9"
+          tag="Cache"
         />
         <StatCard
           icon={<QcIcon />}
           value="—"
           label="Score QC Medio"
           sub="Target: > 85/100"
+          color="#10B981"
+          tag="QC"
         />
       </div>
 
-      {/* 7 Slide Templates */}
+      {/* ── 7 Slide Templates ──────────────────────────────────── */}
       <div className="mb-8">
-        <div className="flex items-baseline gap-3 mb-4">
-          <h2 className="text-lg font-bold" style={{ color: "var(--text-primary)" }}>
-            7 Template Slide
-          </h2>
-          <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-            style={{ background: "rgba(139,92,246,0.15)", color: "var(--purple-400)" }}>
-            generati in parallelo
-          </span>
-        </div>
+        <SectionHeader title="7 Template Slide" badge="parallele" />
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {SLIDE_TYPES.map((s) => (
-            <div key={s.num} className="card p-4 flex flex-col gap-2">
-              <div className="flex items-center gap-2">
-                <span
-                  className="text-xs font-black font-mono"
-                  style={{ color: "var(--purple-500)" }}
-                >
-                  {s.num}
-                </span>
-                <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                  {s.name}
-                </span>
+          {SLIDE_TYPES.map((s, idx) => {
+            const hue = SLIDE_COLORS[idx % SLIDE_COLORS.length];
+            return (
+              <div key={s.num} className="card p-4 flex flex-col gap-2 transition-all">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black font-mono" style={{ color: hue }}>
+                    {s.num}
+                  </span>
+                  <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                    {s.name}
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
+                  {s.desc}
+                </p>
+                <div className="mt-auto pt-2">
+                  <div className="h-0.5 rounded-full w-8" style={{ background: hue, opacity: 0.5 }} />
+                </div>
               </div>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--text-muted)" }}>
-                {s.desc}
-              </p>
-            </div>
-          ))}
-          {/* Placeholder card for the 8th slot */}
-          <div className="card p-4 flex flex-col items-center justify-center gap-2 opacity-40"
+            );
+          })}
+          <div className="card p-4 flex flex-col items-center justify-center gap-2 opacity-35"
             style={{ borderStyle: "dashed" }}>
-            <span className="text-2xl" style={{ color: "var(--text-muted)" }}>+</span>
+            <span className="text-xl font-light" style={{ color: "var(--text-muted)" }}>+</span>
             <span className="text-xs text-center" style={{ color: "var(--text-muted)" }}>
-              Slide custom<br />in roadmap
+              Custom slide<br />in roadmap
             </span>
           </div>
         </div>
       </div>
 
-      {/* AI Stack + Pipeline */}
+      {/* ── AI Stack + Pipeline ────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
 
         {/* AI Stack */}
         <div className="card p-6">
-          <h2 className="text-base font-bold mb-4" style={{ color: "var(--text-primary)" }}>
-            AI Stack
-          </h2>
-          <div className="flex flex-col gap-3">
+          <SectionHeader title="AI Stack" />
+          <div className="flex flex-col gap-3 mt-4">
             {AI_MODELS.map((m) => (
               <div key={m.name} className="flex items-center gap-3">
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ background: m.dot, boxShadow: `0 0 6px ${m.dot}` }}
-                />
+                <span className="w-2.5 h-2.5 rounded-full shrink-0"
+                  style={{ background: m.dot, boxShadow: `0 0 8px ${m.dot}88` }} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
                     {m.name}
                   </p>
-                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                    {m.role}
-                  </p>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>{m.role}</p>
                 </div>
-                <span
-                  className="text-xs px-2 py-0.5 rounded font-medium shrink-0"
-                  style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)" }}
-                >
+                <span className="text-xs px-2 py-0.5 rounded font-medium shrink-0"
+                  style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)" }}>
                   {m.tag}
                 </span>
               </div>
@@ -273,32 +269,23 @@ export default function HomePage() {
           </div>
         </div>
 
-        {/* Pipeline come funziona */}
+        {/* Pipeline */}
         <div className="card p-6">
-          <h2 className="text-base font-bold mb-4" style={{ color: "var(--text-primary)" }}>
-            Come funziona la pipeline
-          </h2>
-          <div className="flex flex-col gap-4">
+          <SectionHeader title="Come funziona" />
+          <div className="flex flex-col gap-4 mt-4">
             {[
-              { step: "01", title: "Scraping", desc: "Rainforest API estrae dati e immagini di riferimento dal prodotto Amazon.", color: "#7C3AED" },
-              { step: "02", title: "MVD Analysis", desc: "Claude Haiku analizza le immagini e produce un Material Vision Document JSON.", color: "#8B5CF6" },
-              { step: "03", title: "Generazione", desc: "Gemini Flash genera le 7 slide in parallelo con lighting PBR-accurate.", color: "#A855F7" },
-              { step: "04", title: "QC + Export", desc: "Vision QC valuta la coerenza. Pillow composita i testi e carica su R2.", color: "#EC4899" },
+              { n: "01", title: "Scraping",    desc: "Rainforest API estrae dati e immagini dal prodotto Amazon.",            color: "#8B5CF6" },
+              { n: "02", title: "MVD",         desc: "Claude Haiku analizza e genera un Material Vision Document JSON.",        color: "#0EA5E9" },
+              { n: "03", title: "Generazione", desc: "Gemini Flash genera le 7 slide in parallelo con lighting professionale.", color: "#A855F7" },
+              { n: "04", title: "QC + Export", desc: "Vision QC valuta coerenza. Pillow composita i testi e carica su R2.",    color: "#EC4899" },
             ].map((item) => (
-              <div key={item.step} className="flex gap-3">
-                <span
-                  className="text-sm font-black font-mono shrink-0 mt-0.5"
-                  style={{ color: item.color }}
-                >
-                  {item.step}
+              <div key={item.n} className="flex gap-3">
+                <span className="text-xs font-black font-mono shrink-0 mt-0.5" style={{ color: item.color }}>
+                  {item.n}
                 </span>
                 <div>
-                  <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                    {item.title}
-                  </p>
-                  <p className="text-xs leading-relaxed mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    {item.desc}
-                  </p>
+                  <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>{item.title}</p>
+                  <p className="text-xs leading-relaxed mt-0.5" style={{ color: "var(--text-muted)" }}>{item.desc}</p>
                 </div>
               </div>
             ))}
@@ -306,40 +293,53 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Setup checklist */}
+      {/* ── Setup API Keys ─────────────────────────────────────── */}
       <div className="card p-6">
         <div className="flex items-baseline gap-3 mb-4">
-          <h2 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>
-            Setup API Keys
-          </h2>
+          <SectionHeader title="Setup API Keys" />
           <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Configura su Vercel → Settings → Environment Variables
+            Vercel → Settings → Environment Variables
           </span>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {SETUP_KEYS.map((k) => (
-            <div key={k.key} className="flex items-start gap-3 p-3 rounded-lg"
-              style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.05)" }}>
-              <span
-                className="w-2 h-2 rounded-full shrink-0 mt-1.5"
-                style={{ background: "var(--border)", outline: "1px solid var(--border-purple)" }}
-              />
+            <div key={k.key} className="flex items-start gap-3 p-3 rounded-xl transition-all"
+              style={{
+                background: "rgba(255,255,255,0.03)",
+                border: `1px solid ${k.color}22`,
+              }}>
+              <span className="w-2 h-2 rounded-full shrink-0 mt-1.5"
+                style={{ background: k.color, boxShadow: `0 0 6px ${k.color}88` }} />
               <div className="min-w-0">
-                <p className="text-xs font-mono font-semibold truncate" style={{ color: "var(--purple-400)" }}>
+                <p className="text-xs font-mono font-semibold truncate" style={{ color: k.color }}>
                   {k.key}
                 </p>
-                <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>
+                <p className="text-xs font-medium mt-0.5" style={{ color: "var(--text-primary)" }}>
                   {k.service}
                 </p>
-                <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-                  {k.desc}
-                </p>
+                <p className="text-xs" style={{ color: "var(--text-muted)" }}>{k.desc}</p>
               </div>
             </div>
           ))}
         </div>
       </div>
 
+    </div>
+  );
+}
+
+const SLIDE_COLORS = ["#8B5CF6", "#0EA5E9", "#EC4899", "#10B981", "#F59E0B", "#F97316", "#A855F7"];
+
+function SectionHeader({ title, badge }: { title: string; badge?: string }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <h2 className="text-base font-bold" style={{ color: "var(--text-primary)" }}>{title}</h2>
+      {badge && (
+        <span className="text-xs px-2 py-0.5 rounded-full font-medium"
+          style={{ background: "rgba(139,92,246,0.15)", color: "var(--purple-400)" }}>
+          {badge}
+        </span>
+      )}
     </div>
   );
 }
@@ -362,17 +362,14 @@ function SparkleIcon() {
 function SlideIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="2" y="3" width="20" height="14" rx="2" />
-      <line x1="8" y1="21" x2="16" y2="21" />
-      <line x1="12" y1="17" x2="12" y2="21" />
+      <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line x1="12" y1="17" x2="12" y2="21" />
     </svg>
   );
 }
 function AsinIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" />
-      <line x1="7" y1="7" x2="7.01" y2="7" />
+      <path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line x1="7" y1="7" x2="7.01" y2="7" />
     </svg>
   );
 }

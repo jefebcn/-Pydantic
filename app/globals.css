@@ -103,6 +103,16 @@ h1, h2, h3, h4, h5, h6 {
   animation: pulse-purple 2s infinite;
 }
 
+/* Float animation for hero blob */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  33%       { transform: translateY(-12px) rotate(4deg); }
+  66%       { transform: translateY(-6px) rotate(-3deg); }
+}
+.blob-float {
+  animation: float 8s ease-in-out infinite;
+}
+
 /* Shimmer for progress bar */
 @keyframes shimmer {
   0%   { background-position: -200% center; }

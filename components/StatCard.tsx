@@ -3,25 +3,37 @@ interface StatCardProps {
   value: string | number;
   label: string;
   sub?: string;
-  accent?: boolean;
+  color?: string;  // hex color, defaults to purple
+  tag?: string;    // badge text, defaults to "Live"
 }
 
-export default function StatCard({ icon, value, label, sub, accent }: StatCardProps) {
+export default function StatCard({
+  icon,
+  value,
+  label,
+  sub,
+  color = "#8B5CF6",
+  tag = "Live",
+}: StatCardProps) {
+  const [r, g, b] = hexToRgb(color);
+
   return (
     <div
-      className="card p-5 flex flex-col gap-3"
-      style={accent ? { borderColor: "rgba(139,92,246,0.35)" } : {}}
+      className="card p-5 flex flex-col gap-3 transition-all"
+      style={{ borderColor: `rgba(${r},${g},${b},0.30)` }}
     >
       <div className="flex items-center justify-between">
         <div
           className="w-9 h-9 rounded-lg flex items-center justify-center"
-          style={{ background: "rgba(139,92,246,0.15)", color: "var(--purple-400)" }}
+          style={{ background: `rgba(${r},${g},${b},0.14)`, color }}
         >
           {icon}
         </div>
-        <span className="text-xs font-medium px-2 py-1 rounded-full"
-          style={{ background: "rgba(139,92,246,0.1)", color: "var(--purple-400)" }}>
-          Live
+        <span
+          className="text-xs font-medium px-2 py-1 rounded-full"
+          style={{ background: `rgba(${r},${g},${b},0.10)`, color }}
+        >
+          {tag}
         </span>
       </div>
       <div>
@@ -39,4 +51,14 @@ export default function StatCard({ icon, value, label, sub, accent }: StatCardPr
       </div>
     </div>
   );
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+  const clean = hex.replace("#", "");
+  if (clean.length !== 6) return [139, 92, 246]; // fallback purple
+  return [
+    parseInt(clean.slice(0, 2), 16),
+    parseInt(clean.slice(2, 4), 16),
+    parseInt(clean.slice(4, 6), 16),
+  ];
 }

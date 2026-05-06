@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, DM_Sans, DM_Mono } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
+import TopBar from "@/components/TopBar";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -38,8 +39,11 @@ export default function RootLayout({
     >
       <body className="min-h-full flex" style={{ background: "var(--bg-base)" }}>
         <Sidebar />
-        <div className="flex-1 min-h-screen overflow-y-auto">
-          {children}
+        <div className="flex-1 min-h-screen overflow-y-auto flex flex-col">
+          <TopBar />
+          <div className="flex-1">
+            {children}
+          </div>
         </div>
       </body>
     </html>
