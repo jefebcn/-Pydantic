@@ -73,11 +73,62 @@ function categorizeError(msg: string, status: number): AppError {
     hint: "Controlla i log su Vercel Dashboard o apri la console del browser (F12)." };
 }
 
+interface MarianoResult {
+  product_visual_description: string;
+  categoria_effetto_01b: string;
+  accent_color_hex: string;
+  palette_sfondo_hex: string[];
+  images: Array<{ number: string; name: string; prompt: string; logo_variant: string | null }>;
+  negative_prompt: string;
+}
+
 export default function HomePage() {
   const [asin, setAsin]         = useState("");
   const [loading, setLoading]   = useState(false);
   const [appError, setAppError] = useState<AppError | null>(null);
   const router = useRouter();
+
+  /* Mariano Prompts.json generator */
+  const [marianoAsin, setMarianoAsin]         = useState("");
+  const [marianoLoading, setMarianoLoading]   = useState(false);
+  const [marianoError, setMarianoError]       = useState<string | null>(null);
+  const [marianoResult, setMarianoResult]     = useState<MarianoResult | null>(null);
+  const [expandedImg, setExpandedImg]         = useState<string | null>(null);
+
+  const handleMarianoGenerate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!marianoAsin.match(/^[A-Z0-9]{10}$/)) {
+      setMarianoError("ASIN deve essere 10 caratteri alfanumerici");
+      return;
+    }
+    setMarianoLoading(true);
+    setMarianoError(null);
+    setMarianoResult(null);
+    try {
+      const res  = await fetch("/api/generate-mariano", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asin: marianoAsin }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setMarianoError(data.error || `HTTP ${res.status}`); return; }
+      setMarianoResult(data as MarianoResult);
+    } catch (err) {
+      setMarianoError(err instanceof Error ? err.message : "Errore di rete");
+    } finally {
+      setMarianoLoading(false);
+    }
+  };
+
+  const downloadMarianoJson = () => {
+    if (!marianoResult) return;
+    const { _analysis: _, ...clean } = marianoResult as MarianoResult & { _analysis?: unknown };
+    const blob = new Blob([JSON.stringify(clean, null, 2)], { type: "application/json" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = `${marianoAsin}_prompts.json`; a.click();
+    URL.revokeObjectURL(url);
+  };
 
   /* Custom slides state — persisted in localStorage */
   const [customSlides, setCustomSlides] = useState<CustomSlide[]>([]);
@@ -348,6 +399,191 @@ export default function HomePage() {
           color="#10B981"
           tag="QC"
         />
+      </div>
+
+      {/* ── Mariano Prompts.json Generator ─────────────────────── */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <SectionHeader title="Genera Prompts.json" badge="Mariano Style · 10 foto" />
+        </div>
+
+        {/* Input card */}
+        <div className="card p-6 mb-4">
+          <p className="text-xs mb-3" style={{ color: "var(--text-muted)" }}>
+            Analizza un ASIN e genera automaticamente un <code className="text-xs px-1 py-0.5 rounded" style={{ background: "rgba(139,92,246,0.15)", color: "var(--purple-400)" }}>prompts.json</code> professionale
+            in stile Mariano — 10 immagini, PHOTO EDITING task, prodotto intoccabile.
+          </p>
+          <form onSubmit={handleMarianoGenerate} className="flex flex-col sm:flex-row gap-3">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={marianoAsin}
+                onChange={(e) => { setMarianoAsin(e.target.value.toUpperCase()); setMarianoError(null); }}
+                placeholder="ASIN — es. B08N5WRWNW"
+                maxLength={10}
+                className="w-full px-4 py-3 rounded-xl font-mono text-base tracking-widest outline-none transition-all"
+                style={{
+                  background: "rgba(11,11,24,0.6)",
+                  border: marianoError ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(139,92,246,0.3)",
+                  color: "var(--text-primary)",
+                }}
+                onFocus={(e) => { if (!marianoError) e.currentTarget.style.boxShadow = "0 0 0 3px rgba(139,92,246,0.2)"; }}
+                onBlur={(e)  => { e.currentTarget.style.boxShadow = "none"; }}
+              />
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono"
+                style={{ color: marianoAsin.length === 10 ? "var(--purple-400)" : "var(--text-muted)" }}>
+                {marianoAsin.length}/10
+              </span>
+            </div>
+            <button
+              type="submit"
+              disabled={marianoLoading || marianoAsin.length !== 10}
+              className="btn-primary whitespace-nowrap"
+            >
+              {marianoLoading
+                ? <span className="flex items-center gap-2"><SpinnerIcon />Analisi AI...</span>
+                : <span className="flex items-center gap-2"><JsonIcon />Genera JSON</span>
+              }
+            </button>
+          </form>
+
+          {marianoError && (
+            <p className="mt-2 text-xs font-mono" style={{ color: "#F87171" }}>
+              ✕ {marianoError}
+            </p>
+          )}
+
+          {/* Steps explanation */}
+          <div className="flex gap-3 flex-wrap mt-3 pt-3" style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            {["Scraping Amazon", "Vision AI analisi", "Genera 10 prompt", "Download JSON"].map((s, i) => (
+              <div key={s} className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-muted)" }}>
+                <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                  style={{ background: "rgba(139,92,246,0.2)", color: "var(--purple-400)" }}>
+                  {i + 1}
+                </span>
+                {s}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Result */}
+        {marianoResult && (
+          <div className="card p-6 space-y-5">
+            {/* Header bar */}
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full shrink-0" style={{
+                  background: marianoResult.accent_color_hex,
+                  boxShadow: `0 0 12px ${marianoResult.accent_color_hex}99`,
+                }} />
+                <div>
+                  <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                    prompts.json generato — {marianoAsin}
+                  </p>
+                  <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    Effetto: <span style={{ color: marianoResult.accent_color_hex }}>{marianoResult.categoria_effetto_01b}</span>
+                    {" · "}Accent: <code className="font-mono">{marianoResult.accent_color_hex}</code>
+                    {" · "}{marianoResult.images.length} immagini
+                  </p>
+                </div>
+              </div>
+              <button onClick={downloadMarianoJson}
+                className="flex items-center gap-2 text-xs px-4 py-2 rounded-lg font-semibold transition-all"
+                style={{
+                  background: "rgba(139,92,246,0.18)",
+                  color: "var(--purple-400)",
+                  border: "1px solid rgba(139,92,246,0.3)",
+                }}>
+                <DownloadIcon /> Download .json
+              </button>
+            </div>
+
+            {/* Color palette */}
+            <div>
+              <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-muted)" }}>PALETTE SFONDO</p>
+              <div className="flex gap-2">
+                {marianoResult.palette_sfondo_hex.map((c) => (
+                  <div key={c} className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg border" style={{ background: c, borderColor: "rgba(255,255,255,0.1)" }} />
+                    <code className="text-xs font-mono" style={{ color: "var(--text-muted)" }}>{c}</code>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Visual description */}
+            <div>
+              <p className="text-xs font-semibold mb-2" style={{ color: "var(--text-muted)" }}>DESCRIZIONE VISIVA PRODOTTO</p>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-primary)" }}>
+                {marianoResult.product_visual_description}
+              </p>
+            </div>
+
+            {/* 10 image cards */}
+            <div>
+              <p className="text-xs font-semibold mb-3" style={{ color: "var(--text-muted)" }}>
+                10 IMMAGINI GENERATE
+              </p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {marianoResult.images.map((img) => (
+                  <button
+                    key={img.number}
+                    onClick={() => setExpandedImg(expandedImg === img.number ? null : img.number)}
+                    className="text-left rounded-xl p-3 transition-all"
+                    style={{
+                      background: expandedImg === img.number ? "rgba(139,92,246,0.15)" : "rgba(255,255,255,0.04)",
+                      border: expandedImg === img.number
+                        ? `1px solid ${marianoResult.accent_color_hex}66`
+                        : "1px solid rgba(255,255,255,0.08)",
+                    }}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-mono font-bold" style={{ color: marianoResult.accent_color_hex }}>
+                        {img.number}
+                      </span>
+                      {img.logo_variant && (
+                        <span className="text-[10px] px-1 rounded" style={{ background: "rgba(252,211,77,0.15)", color: "#FCD34D" }}>
+                          LOGO
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-semibold leading-tight" style={{ color: "var(--text-primary)" }}>
+                      {img.name}
+                    </p>
+                    <p className="text-[10px] mt-1 line-clamp-2" style={{ color: "var(--text-muted)" }}>
+                      {img.prompt.split("\n\n").slice(-1)[0]?.slice(0, 80)}…
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Expanded prompt viewer */}
+            {expandedImg && (() => {
+              const img = marianoResult.images.find((i) => i.number === expandedImg);
+              if (!img) return null;
+              return (
+                <div className="rounded-xl p-4 relative"
+                  style={{ background: "rgba(0,0,0,0.3)", border: `1px solid ${marianoResult.accent_color_hex}33` }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                      Immagine {img.number} — {img.name}
+                    </p>
+                    <button onClick={() => setExpandedImg(null)}
+                      className="text-xs w-6 h-6 rounded flex items-center justify-center"
+                      style={{ background: "rgba(255,255,255,0.08)", color: "var(--text-muted)" }}>
+                      ✕
+                    </button>
+                  </div>
+                  <pre className="text-xs font-mono leading-relaxed whitespace-pre-wrap break-words overflow-auto max-h-96"
+                    style={{ color: "#A0A0C0" }}>
+                    {img.prompt}
+                  </pre>
+                </div>
+              );
+            })()}
+          </div>
+        )}
       </div>
 
       {/* ── Template Slide ─────────────────────────────────────── */}
@@ -646,6 +882,20 @@ function QcIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  );
+}
+function JsonIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" />
+    </svg>
+  );
+}
+function DownloadIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
     </svg>
   );
 }

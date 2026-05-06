@@ -9,6 +9,9 @@
     },
     "api/status.py": {
       "maxDuration": 10
+    },
+    "api/generate_mariano.py": {
+      "maxDuration": 60
     }
   },
   "rewrites": [
@@ -19,6 +22,10 @@
     {
       "source": "/api/status",
       "destination": "/api/status.py"
+    },
+    {
+      "source": "/api/generate-mariano",
+      "destination": "/api/generate_mariano.py"
     }
   ],
   "headers": [
