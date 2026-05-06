@@ -1,0 +1,35 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "outputDirectory": ".next",
+  "installCommand": "npm install && pip install -r requirements.txt",
+  "functions": {
+    "api/generate.py": {
+      "runtime": "python3.12",
+      "maxDuration": 120
+    },
+    "api/status.py": {
+      "runtime": "python3.12",
+      "maxDuration": 10
+    }
+  },
+  "rewrites": [
+    {
+      "source": "/api/generate",
+      "destination": "/api/generate.py"
+    },
+    {
+      "source": "/api/status",
+      "destination": "/api/status.py"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" }
+      ]
+    }
+  ]
+}
