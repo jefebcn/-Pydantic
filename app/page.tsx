@@ -29,32 +29,87 @@ const SETUP_KEYS = [
   { key: "NEXT_PUBLIC_SUPABASE_URL",  service: "Supabase",         desc: "DB jobs + cache ASIN",   color: "#4ADE80" },
 ];
 
+interface AppError {
+  title: string;
+  message: string;
+  hint: string;
+  status?: number;
+}
+
+function categorizeError(msg: string, status: number): AppError {
+  const m = msg.toLowerCase();
+  if (status === 0 || m.includes("failed to fetch") || m.includes("networkerror")) {
+    return { title: "Errore di rete", message: msg, status,
+      hint: "Controlla la connessione internet o se il server è in esecuzione." };
+  }
+  if (m.match(/api.?key|anthropic|openai|google.?ai|helicone/)) {
+    return { title: "API key mancante o non valida", message: msg, status,
+      hint: "Vai su Vercel → Settings → Environment Variables e aggiungi le chiavi mancanti." };
+  }
+  if (m.match(/supabase|postgres|database|relation|table|schema/)) {
+    return { title: "Database non configurato", message: msg, status,
+      hint: "Esegui supabase/schema.sql nel SQL Editor di Supabase e verifica NEXT_PUBLIC_SUPABASE_URL." };
+  }
+  if (m.match(/rainforest|scraping|asin.*(not found|invalid|error)/)) {
+    return { title: "Errore scraping Amazon", message: msg, status,
+      hint: "Controlla RAINFOREST_API_KEY e verifica che l'ASIN esista su Amazon.it." };
+  }
+  if (m.match(/r2|cloudflare|bucket|s3|storage/)) {
+    return { title: "Errore storage R2", message: msg, status,
+      hint: "Controlla le variabili CLOUDFLARE_R2_* e i permessi del bucket." };
+  }
+  if (status === 400) {
+    return { title: "Richiesta non valida", message: msg, status,
+      hint: "Verifica che l'ASIN sia esattamente 10 caratteri alfanumerici." };
+  }
+  if (status >= 500) {
+    return { title: `Errore server (${status})`, message: msg, status,
+      hint: "Controlla i log in tempo reale su Vercel Dashboard → Deployments → Functions." };
+  }
+  return { title: "Errore sconosciuto", message: msg, status,
+    hint: "Controlla i log su Vercel Dashboard o apri la console del browser (F12)." };
+}
+
 export default function HomePage() {
   const [asin, setAsin]       = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError]     = useState("");
+  const [appError, setAppError] = useState<AppError | null>(null);
   const router = useRouter();
+
+  const clearError = () => setAppError(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!asin.match(/^[A-Z0-9]{10}$/)) {
-      setError("ASIN non valido — deve essere 10 caratteri alfanumerici");
+      setAppError({ title: "ASIN non valido", status: 400,
+        message: `"${asin}" non è un ASIN valido.`,
+        hint: "Un ASIN è composto da esattamente 10 caratteri alfanumerici (es. B08N5WRWNW)." });
       return;
     }
     setLoading(true);
-    setError("");
+    setAppError(null);
 
-    const res = await fetch("/api/generate", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ asin: asin.toUpperCase() }),
-    });
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asin: asin.toUpperCase() }),
+      });
 
-    const data = await res.json();
-    if (data.job_id) {
-      router.push(`/results/${data.job_id}`);
-    } else {
-      setError(data.error || "Errore sconosciuto");
+      let data: Record<string, string> = {};
+      try { data = await res.json(); } catch { /* body not JSON */ }
+
+      if (res.ok && data.job_id) {
+        router.push(`/results/${data.job_id}`);
+        return;
+      }
+
+      const rawMsg = data.error || data.message || (res.ok ? "Nessun job_id ricevuto" : `HTTP ${res.status}`);
+      setAppError(categorizeError(rawMsg, res.status));
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Errore di rete sconosciuto";
+      setAppError(categorizeError(msg, 0));
+    } finally {
       setLoading(false);
     }
   };
@@ -95,17 +150,17 @@ export default function HomePage() {
                 <input
                   type="text"
                   value={asin}
-                  onChange={(e) => { setAsin(e.target.value.toUpperCase()); setError(""); }}
+                  onChange={(e) => { setAsin(e.target.value.toUpperCase()); clearError(); }}
                   placeholder="Es. B08N5WRWNW"
                   maxLength={10}
                   className="w-full px-4 py-3 rounded-xl font-mono text-base tracking-widest outline-none transition-all"
                   style={{
                     background: "rgba(11,11,24,0.6)",
-                    border: error ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(139,92,246,0.3)",
+                    border: appError ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(139,92,246,0.3)",
                     color: "var(--text-primary)",
-                    boxShadow: error ? "0 0 0 3px rgba(239,68,68,0.1)" : "none",
+                    boxShadow: appError ? "0 0 0 3px rgba(239,68,68,0.1)" : "none",
                   }}
-                  onFocus={(e) => { if (!error) e.currentTarget.style.boxShadow = "0 0 0 3px rgba(139,92,246,0.2)"; }}
+                  onFocus={(e) => { if (!appError) e.currentTarget.style.boxShadow = "0 0 0 3px rgba(139,92,246,0.2)"; }}
                   onBlur={(e)  => { e.currentTarget.style.boxShadow = "none"; }}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-mono"
@@ -125,7 +180,56 @@ export default function HomePage() {
                 )}
               </button>
             </form>
-            {error && <p className="mt-2 text-xs" style={{ color: "#f87171" }}>⚠ {error}</p>}
+            {appError && (
+              <div className="mt-3 rounded-xl p-4 relative"
+                style={{
+                  background: "rgba(248,113,113,0.07)",
+                  border: "1px solid rgba(248,113,113,0.35)",
+                  borderLeft: "3px solid #F87171",
+                }}>
+                {/* Dismiss */}
+                <button onClick={clearError}
+                  className="absolute top-3 right-3 w-5 h-5 rounded flex items-center justify-center text-xs transition-all"
+                  style={{ color: "rgba(248,113,113,0.6)", background: "rgba(248,113,113,0.1)" }}>
+                  ✕
+                </button>
+
+                <div className="flex items-start gap-3 pr-6">
+                  <span className="shrink-0 mt-0.5" style={{ color: "#F87171" }}>
+                    <ErrorIcon />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    {/* Title + status */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-bold" style={{ color: "#F87171" }}>
+                        {appError.title}
+                      </p>
+                      {appError.status !== undefined && appError.status > 0 && (
+                        <span className="text-xs px-1.5 py-0.5 rounded font-mono"
+                          style={{ background: "rgba(248,113,113,0.15)", color: "#FCA5A5" }}>
+                          {appError.status}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Raw message */}
+                    <p className="text-xs mt-1.5 font-mono leading-relaxed break-all"
+                      style={{ color: "#FCA5A5" }}>
+                      {appError.message}
+                    </p>
+
+                    {/* Hint */}
+                    <div className="flex items-start gap-1.5 mt-2.5 pt-2.5"
+                      style={{ borderTop: "1px solid rgba(248,113,113,0.2)" }}>
+                      <span className="text-xs shrink-0" style={{ color: "#FCD34D" }}>→</span>
+                      <p className="text-xs leading-relaxed" style={{ color: "#FCD34D" }}>
+                        {appError.hint}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Mini pipeline steps */}
@@ -374,6 +478,15 @@ function SectionHeader({ title, badge }: { title: string; badge?: string }) {
 }
 
 /* Icons */
+function ErrorIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="8" x2="12" y2="12" />
+      <line x1="12" y1="16" x2="12.01" y2="16" />
+    </svg>
+  );
+}
 function SpinnerIcon() {
   return (
     <svg className="animate-spin" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
