@@ -20,8 +20,9 @@
 @theme inline {
   --color-background: var(--bg-base);
   --color-foreground: var(--text-primary);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans:    var(--font-sans);
+  --font-mono:    var(--font-mono);
+  --font-display: var(--font-display);
 }
 
 * {
@@ -31,8 +32,13 @@
 body {
   background: var(--bg-base);
   color: var(--text-primary);
-  font-family: var(--font-geist-sans), system-ui, -apple-system, sans-serif;
+  font-family: var(--font-sans), "DM Sans", system-ui, -apple-system, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display), "Space Grotesk", system-ui, sans-serif;
+  letter-spacing: -0.02em;
 }
 
 /* Scrollbar */

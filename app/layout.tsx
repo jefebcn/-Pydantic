@@ -1,16 +1,24 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, DM_Sans, DM_Mono } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-display",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const dmSans = DM_Sans({
+  variable: "--font-sans",
   subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+});
+
+const dmMono = DM_Mono({
+  variable: "--font-mono",
+  subsets: ["latin"],
+  weight: ["300", "400", "500"],
 });
 
 export const metadata: Metadata = {
@@ -26,7 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="it"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${spaceGrotesk.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex" style={{ background: "var(--bg-base)" }}>
         <Sidebar />
