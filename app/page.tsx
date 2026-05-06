@@ -1,7 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import StatCard from "@/components/StatCard";
+import CustomSlideModal, { type CustomSlide } from "@/components/CustomSlideModal";
+
+const CUSTOM_STORAGE_KEY = "custom_slides_v1";
 
 const SLIDE_TYPES = [
   { num: "01", name: "Hero",             desc: "Prodotto su sfondo neutro, illuminazione drammatica tre-point." },
@@ -71,10 +74,45 @@ function categorizeError(msg: string, status: number): AppError {
 }
 
 export default function HomePage() {
-  const [asin, setAsin]       = useState("");
-  const [loading, setLoading] = useState(false);
+  const [asin, setAsin]         = useState("");
+  const [loading, setLoading]   = useState(false);
   const [appError, setAppError] = useState<AppError | null>(null);
   const router = useRouter();
+
+  /* Custom slides state — persisted in localStorage */
+  const [customSlides, setCustomSlides] = useState<CustomSlide[]>([]);
+  const [modalOpen, setModalOpen]       = useState(false);
+  const [editSlide, setEditSlide]       = useState<CustomSlide | null>(null);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(CUSTOM_STORAGE_KEY);
+      if (saved) setCustomSlides(JSON.parse(saved));
+    } catch { /* no-op */ }
+  }, []);
+
+  const persistSlides = (slides: CustomSlide[]) => {
+    setCustomSlides(slides);
+    try { localStorage.setItem(CUSTOM_STORAGE_KEY, JSON.stringify(slides)); } catch { /* no-op */ }
+  };
+
+  const handleSaveCustom = (slide: CustomSlide) => {
+    const existing = customSlides.findIndex((s) => s.id === slide.id);
+    if (existing >= 0) {
+      const updated = [...customSlides];
+      updated[existing] = slide;
+      persistSlides(updated);
+    } else {
+      persistSlides([...customSlides, slide]);
+    }
+  };
+
+  const handleDeleteCustom = (id: string) => {
+    persistSlides(customSlides.filter((s) => s.id !== id));
+  };
+
+  const openNew  = () => { setEditSlide(null); setModalOpen(true); };
+  const openEdit = (slide: CustomSlide) => { setEditSlide(slide); setModalOpen(true); };
 
   const clearError = () => setAppError(null);
 
@@ -312,10 +350,25 @@ export default function HomePage() {
         />
       </div>
 
-      {/* ── 7 Slide Templates ──────────────────────────────────── */}
+      {/* ── Template Slide ─────────────────────────────────────── */}
       <div className="mb-8">
-        <div className="mb-4"><SectionHeader title="7 Template Slide" badge="parallele" /></div>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-baseline gap-2">
+            <SectionHeader title="Template Slide" badge={`${7 + customSlides.length} totali`} />
+          </div>
+          <button onClick={openNew}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-semibold transition-all"
+            style={{
+              background: "rgba(34,211,153,0.12)",
+              color: "#34D399",
+              border: "1px solid rgba(34,211,153,0.3)",
+            }}>
+            <span className="text-sm leading-none">+</span> Slide custom
+          </button>
+        </div>
+
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          {/* Standard 7 slides */}
           {SLIDE_TYPES.map((s, idx) => {
             const hue = SLIDE_COLORS[idx % SLIDE_COLORS.length];
             const [r, g, b] = hexToRgbArr(hue);
@@ -329,24 +382,18 @@ export default function HomePage() {
                   borderTop: `2px solid ${hue}`,
                 }}
               >
-                {/* corner glow */}
                 <div className="absolute -top-4 -right-4 w-14 h-14 rounded-full pointer-events-none"
                   style={{ background: `rgba(${r},${g},${b},0.18)`, filter: "blur(12px)" }} />
-
                 <div className="flex items-center gap-2">
-                  <span
-                    className="text-base font-black font-mono"
-                    style={{ color: hue, textShadow: `0 0 10px rgba(${r},${g},${b},0.6)` }}
-                  >
+                  <span className="text-base font-black font-mono"
+                    style={{ color: hue, textShadow: `0 0 10px rgba(${r},${g},${b},0.6)` }}>
                     {s.num}
                   </span>
                   <span className="text-xs sm:text-sm font-bold" style={{ color: "var(--text-primary)" }}>
                     {s.name}
                   </span>
                 </div>
-                <p className="text-xs leading-relaxed" style={{ color: "#A0A0C0" }}>
-                  {s.desc}
-                </p>
+                <p className="text-xs leading-relaxed" style={{ color: "#A0A0C0" }}>{s.desc}</p>
                 <div className="mt-auto pt-1">
                   <div className="h-[2px] rounded-full"
                     style={{ background: `linear-gradient(90deg, ${hue}, transparent)`, width: "60%" }} />
@@ -354,21 +401,101 @@ export default function HomePage() {
               </div>
             );
           })}
-          {/* Placeholder */}
-          <div
-            className="rounded-xl p-4 flex flex-col items-center justify-center gap-2"
+
+          {/* Custom slides */}
+          {customSlides.map((cs, idx) => (
+            <div
+              key={cs.id}
+              className="relative overflow-hidden rounded-xl p-4 flex flex-col gap-2 transition-all group"
+              style={{
+                background: "linear-gradient(145deg, rgba(34,211,153,0.08) 0%, #13132A 60%)",
+                border: "1px solid rgba(34,211,153,0.35)",
+                borderTop: "2px solid #34D399",
+              }}
+            >
+              {/* corner glow */}
+              <div className="absolute -top-4 -right-4 w-14 h-14 rounded-full pointer-events-none"
+                style={{ background: "rgba(34,211,153,0.15)", filter: "blur(12px)" }} />
+
+              {/* Edit / Delete — shown on hover */}
+              <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                <button onClick={() => openEdit(cs)}
+                  className="w-6 h-6 rounded flex items-center justify-center text-xs"
+                  style={{ background: "rgba(34,211,153,0.2)", color: "#34D399" }}
+                  title="Modifica">
+                  ✎
+                </button>
+                <button onClick={() => handleDeleteCustom(cs.id)}
+                  className="w-6 h-6 rounded flex items-center justify-center text-xs"
+                  style={{ background: "rgba(248,113,113,0.15)", color: "#F87171" }}
+                  title="Elimina">
+                  ✕
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 pr-14">
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                  style={{ background: "rgba(34,211,153,0.18)", color: "#34D399" }}>
+                  {String(8 + idx).padStart(2, "0")}
+                </span>
+                <span className="text-xs sm:text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                  {cs.name}
+                </span>
+              </div>
+
+              <p className="text-xs leading-relaxed line-clamp-3" style={{ color: "#A0A0C0" }}>
+                {cs.brief}
+              </p>
+
+              {/* Config chips */}
+              <div className="flex gap-1.5 flex-wrap mt-auto pt-1">
+                {[cs.ratio, cs.lighting.replace("_", " ").toLowerCase()].map((chip) => (
+                  <span key={chip} className="text-[10px] px-1.5 py-0.5 rounded"
+                    style={{ background: "rgba(34,211,153,0.1)", color: "#34D399" }}>
+                    {chip}
+                  </span>
+                ))}
+                {cs.textOverlay && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded"
+                    style={{ background: "rgba(252,211,77,0.1)", color: "#FCD34D" }}>
+                    &ldquo;{cs.textOverlay.slice(0, 20)}&rdquo;
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+
+          {/* Add new custom slide */}
+          <button
+            onClick={openNew}
+            className="rounded-xl p-4 flex flex-col items-center justify-center gap-2 transition-all"
             style={{
-              border: "1px dashed rgba(255,255,255,0.12)",
-              background: "rgba(255,255,255,0.02)",
+              border: "1px dashed rgba(34,211,153,0.25)",
+              background: "rgba(34,211,153,0.03)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "rgba(34,211,153,0.5)";
+              e.currentTarget.style.background = "rgba(34,211,153,0.07)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "rgba(34,211,153,0.25)";
+              e.currentTarget.style.background = "rgba(34,211,153,0.03)";
             }}
           >
-            <span className="text-2xl font-light" style={{ color: "rgba(255,255,255,0.25)" }}>+</span>
-            <span className="text-xs text-center" style={{ color: "rgba(255,255,255,0.3)" }}>
-              Custom slide<br />in roadmap
+            <span className="text-2xl font-light" style={{ color: "#34D399", opacity: 0.7 }}>+</span>
+            <span className="text-xs text-center font-medium" style={{ color: "#34D399", opacity: 0.7 }}>
+              Nuova slide<br />custom
             </span>
-          </div>
+          </button>
         </div>
       </div>
+
+      <CustomSlideModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSave={handleSaveCustom}
+        initial={editSlide}
+      />
 
       {/* ── AI Stack + Pipeline ────────────────────────────────── */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
