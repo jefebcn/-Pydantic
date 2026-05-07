@@ -82,6 +82,15 @@ interface MarianoResult {
   negative_prompt: string;
 }
 
+interface GeneratedImage {
+  number: string;
+  name: string;
+  image_b64: string | null;
+  mime: string | null;
+  model: string | null;
+  error: string | null;
+}
+
 export default function HomePage() {
   const [asin, setAsin]         = useState("");
   const [loading, setLoading]   = useState(false);
@@ -89,11 +98,46 @@ export default function HomePage() {
   const router = useRouter();
 
   /* Mariano Prompts.json generator */
-  const [marianoAsin, setMarianoAsin]         = useState("");
-  const [marianoLoading, setMarianoLoading]   = useState(false);
-  const [marianoError, setMarianoError]       = useState<string | null>(null);
-  const [marianoResult, setMarianoResult]     = useState<MarianoResult | null>(null);
-  const [expandedImg, setExpandedImg]         = useState<string | null>(null);
+  const [marianoAsin, setMarianoAsin]             = useState("");
+  const [marianoLoading, setMarianoLoading]       = useState(false);
+  const [marianoError, setMarianoError]           = useState<string | null>(null);
+  const [marianoResult, setMarianoResult]         = useState<MarianoResult | null>(null);
+  const [expandedImg, setExpandedImg]             = useState<string | null>(null);
+
+  /* Image generation */
+  const [imgGenLoading, setImgGenLoading]         = useState(false);
+  const [imgGenError, setImgGenError]             = useState<string | null>(null);
+  const [generatedImages, setGeneratedImages]     = useState<GeneratedImage[]>([]);
+
+  const handleGenerateImages = async () => {
+    if (!marianoResult || !marianoAsin) return;
+    setImgGenLoading(true);
+    setImgGenError(null);
+    setGeneratedImages([]);
+    try {
+      const { _analysis: _, ...cleanJson } = marianoResult as MarianoResult & { _analysis?: unknown };
+      const res = await fetch("/api/generate-mariano-images", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asin: marianoAsin, prompts_json: cleanJson }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setImgGenError(data.error || `HTTP ${res.status}`); return; }
+      setGeneratedImages(data.images ?? []);
+    } catch (err) {
+      setImgGenError(err instanceof Error ? err.message : "Errore di rete");
+    } finally {
+      setImgGenLoading(false);
+    }
+  };
+
+  const downloadImage = (img: GeneratedImage) => {
+    if (!img.image_b64) return;
+    const a = document.createElement("a");
+    a.href = `data:${img.mime ?? "image/png"};base64,${img.image_b64}`;
+    a.download = `${marianoAsin}_${img.number}_${img.name.replace(/\s+/g, "_")}.png`;
+    a.click();
+  };
 
   const handleMarianoGenerate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -582,6 +626,99 @@ export default function HomePage() {
                 </div>
               );
             })()}
+
+            {/* ── Generate Images CTA ─── */}
+            <div className="pt-2" style={{ borderTop: "1px solid rgba(255,255,255,0.07)" }}>
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div>
+                  <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                    Genera le 10 immagini
+                  </p>
+                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                    Gemini riceve le foto reference del prodotto + ogni prompt → genera le infografiche
+                  </p>
+                </div>
+                <button
+                  onClick={handleGenerateImages}
+                  disabled={imgGenLoading}
+                  className="btn-primary whitespace-nowrap"
+                >
+                  {imgGenLoading
+                    ? <span className="flex items-center gap-2"><SpinnerIcon />Generazione ({generatedImages.length}/10)...</span>
+                    : <span className="flex items-center gap-2"><ImageIcon />Genera 10 Immagini</span>
+                  }
+                </button>
+              </div>
+              {imgGenError && (
+                <p className="mt-2 text-xs font-mono" style={{ color: "#F87171" }}>✕ {imgGenError}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Generated images grid ─── */}
+        {generatedImages.length > 0 && (
+          <div className="card p-6 mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                {generatedImages.filter(i => i.image_b64).length}/{generatedImages.length} immagini generate
+              </p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+                Clicca un&apos;immagine per scaricarla
+              </p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+              {generatedImages.map((img) => (
+                <div key={img.number} className="flex flex-col gap-1">
+                  <div
+                    className="aspect-square rounded-xl overflow-hidden relative transition-all"
+                    style={{ border: "1px solid rgba(255,255,255,0.1)" }}
+                  >
+                    {img.image_b64 ? (
+                      <button
+                        onClick={() => downloadImage(img)}
+                        className="w-full h-full group relative"
+                        title={`Scarica ${img.name}`}
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`data:${img.mime ?? "image/png"};base64,${img.image_b64}`}
+                          alt={img.name}
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+                          style={{ background: "rgba(0,0,0,0.55)" }}>
+                          <DownloadIcon />
+                        </div>
+                      </button>
+                    ) : (
+                      <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2"
+                        style={{ background: "rgba(248,113,113,0.08)" }}>
+                        <span style={{ color: "#F87171" }}>✕</span>
+                        <p className="text-[10px] text-center leading-tight" style={{ color: "#F87171" }}>
+                          {img.error?.slice(0, 60)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-[10px] font-mono font-bold"
+                      style={{ color: marianoResult?.accent_color_hex ?? "var(--purple-400)" }}>
+                      {img.number}
+                    </span>
+                    <span className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>
+                      {img.name}
+                    </span>
+                    {img.model && (
+                      <span className="ml-auto text-[9px] px-1 rounded shrink-0"
+                        style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-muted)" }}>
+                        {img.model}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -896,6 +1033,13 @@ function DownloadIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+function ImageIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><polyline points="21 15 16 10 5 21" />
     </svg>
   );
 }

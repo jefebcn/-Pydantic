@@ -12,6 +12,9 @@
     },
     "api/generate_mariano.py": {
       "maxDuration": 60
+    },
+    "api/generate_mariano_images.py": {
+      "maxDuration": 120
     }
   },
   "rewrites": [
@@ -26,6 +29,10 @@
     {
       "source": "/api/generate-mariano",
       "destination": "/api/generate_mariano.py"
+    },
+    {
+      "source": "/api/generate-mariano-images",
+      "destination": "/api/generate_mariano_images.py"
     }
   ],
   "headers": [
