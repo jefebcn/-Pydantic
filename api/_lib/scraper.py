@@ -13,7 +13,7 @@ async def scrape_asin(asin: str) -> dict[str, Any]:
         "api_key": os.environ["RAINFOREST_API_KEY"],
         "type": "product",
         "asin": asin,
-        "amazon_domain": "amazon.com",
+        "amazon_domain": os.environ.get("AMAZON_DOMAIN", "amazon.com"),
         "include_summarization_attributes": "true",
     }
 
