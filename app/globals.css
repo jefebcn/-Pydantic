@@ -128,3 +128,78 @@ h1, h2, h3, h4, h5, h6 {
   background-size: 200% auto;
   animation: shimmer 2s linear infinite;
 }
+
+/* ── New: stepper + reveal animations ─────────────────────────────────── */
+@keyframes fade-up {
+  0%   { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.fade-up { animation: fade-up 0.45s ease-out both; }
+
+@keyframes step-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.35); }
+  50%      { box-shadow: 0 0 0 6px rgba(139, 92, 246, 0); }
+}
+
+.step-dot {
+  width: 2rem; height: 2rem;
+  border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  font-family: var(--font-mono), monospace;
+  transition: all 0.25s;
+  flex-shrink: 0;
+}
+.step-dot.active {
+  background: linear-gradient(135deg, var(--purple-600), var(--purple-400));
+  color: white;
+  box-shadow: var(--glow-purple-btn);
+  animation: step-glow 2s infinite;
+}
+.step-dot.done {
+  background: rgba(74, 222, 128, 0.18);
+  color: #4ADE80;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}
+.step-dot.locked {
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.step-line {
+  flex: 1;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 2px;
+  position: relative;
+  overflow: hidden;
+}
+.step-line.done {
+  background: linear-gradient(90deg, #4ADE80, rgba(74, 222, 128, 0.3));
+}
+.step-line.active::after {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, var(--purple-500), transparent);
+  animation: shimmer 1.4s linear infinite;
+  background-size: 200% auto;
+}
+
+/* Premium card variant for step content */
+.card-step {
+  background: linear-gradient(180deg, rgba(19, 19, 42, 0.85), rgba(13, 13, 30, 0.95));
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  transition: border-color 0.3s, transform 0.3s;
+}
+.card-step.active {
+  border-color: rgba(139, 92, 246, 0.45);
+  box-shadow: var(--glow-purple);
+}
+.card-step.locked {
+  opacity: 0.45;
+  filter: saturate(0.3);
+  pointer-events: none;
+}
