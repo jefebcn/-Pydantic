@@ -49,8 +49,9 @@ async def _run(asin: str, prompts_json: dict) -> dict:
             except Exception:
                 pass
 
-    # Generate all 10 images
-    images = await generate_all(prompts_json, ref_pils, ref_bytes_list, parallel=3)
+    # Generate all 10 images (parallel=5 → 2 batches of 5, faster than 4 batches of 3
+    # which matters with Nano Banana Pro being ~2× slower than Flash)
+    images = await generate_all(prompts_json, ref_pils, ref_bytes_list, parallel=5)
     return {"images": images, "asin": asin}
 
 

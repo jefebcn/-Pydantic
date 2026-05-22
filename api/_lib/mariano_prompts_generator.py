@@ -132,6 +132,37 @@ EFFECT_LIBRARY = {
         "Bokeh chromatic circles ({accent}, soft, 20-80px, 8-20% opacity) scattered across "
         "background. Clean, optical precision aesthetic."
     ),
+    "warm halo": (
+        "WARM HALO: soft circular radial gradient halo of warm {accent} tones behind the "
+        "product, fading from 60% opacity at center to 0% at canvas edges. NO tech grids, NO "
+        "circuit lines, NO digital particles. Subtle organic bokeh circles in warm amber and "
+        "{accent} (40-120px, 8-18% opacity) scattered naturally across background. Hint of warm "
+        "ambient light leak from upper corners (cream/honey tone, 20% opacity). Atmosphere is "
+        "domestic, refined, lifestyle-premium — like a magazine product shot in a real home."
+    ),
+    "natural bokeh": (
+        "NATURAL BOKEH: soft defocused indoor/outdoor environment behind product — large creamy "
+        "bokeh circles in warm neutrals and {accent} (60-180px, 15-30% opacity), suggesting a "
+        "real space (room, kitchen, garden) without identifying it. NO tech elements, NO grid "
+        "lines, NO digital effects. Warm natural daylight ambience, slight haze. Background "
+        "color: muted neutral with subtle {accent} tint. Editorial lifestyle photography feel."
+    ),
+    "metallic shine": (
+        "METALLIC SHINE: refined backdrop with subtle metallic gradient sweep in {accent} and "
+        "warm gold/bronze tones. Soft directional specular highlights crossing diagonally (15% "
+        "opacity). NO grids, NO digital particles. Polished surface reflection hint at the "
+        "bottom (vertical mirror gradient, 20% opacity). Subtle brushed-metal texture overlay "
+        "(3% opacity). Premium hardware/luxury aesthetic — like a product shot for a high-end "
+        "furniture or fixtures catalog."
+    ),
+    "minimal studio": (
+        "MINIMAL STUDIO: clean seamless studio background, gentle radial vignette toward {accent} "
+        "at corners (5-10% opacity). Single soft drop shadow under product (60% opacity, blurred "
+        "30px). NO patterns, NO grids, NO particles, NO digital effects of any kind. Background "
+        "color: solid warm neutral (#F5F0EA to #E8E0D6 gradient) with a barely-visible {accent} "
+        "tint. Mariano-style minimal premium product photography — empty, refined, focus on "
+        "product geometry."
+    ),
 }
 
 # ── Analysis system prompt ─────────────────────────────────────────────────────
@@ -139,14 +170,44 @@ ANALYSIS_SYSTEM_PROMPT = """You are an expert Italian product photographer and A
 Analyze the provided product images and Amazon product data.
 Your task is to extract everything needed to create a professional 10-image Amazon photo set.
 
+CRITICAL RULES — read before producing JSON:
+1. Identify the REAL product category from images + title. Do not infer "tech" from the brand
+   name alone. A brass door handle is "home/hardware", NOT smart-home.
+2. The visual effect (`categoria_effetto_01b`) MUST match the product category — pick from the
+   strict mapping table below. Wrong category = wrong infographic.
+3. All Italian text fields will be RENDERED LITERALLY by an image model. Keep them short,
+   unambiguous, and free of accented characters that the model may garble (avoid à/è/ì/ò/ù
+   when a clean alternative exists: prefer "perche" over "perché", "piu" over "più", etc.).
+4. ALL CAPS fields must be UPPER-CASE only — no mixed case.
+5. Hex colors must be exactly 7 chars: #RRGGBB.
+
 Output JSON only. No markdown fences. No commentary. All text in Italian except hex codes, icon descriptions, and spec values.
+
+STRICT CATEGORY → EFFECT MAPPING (use exactly the right-hand string in `categoria_effetto_01b`):
+  audio (cuffie, speaker, microfoni)              → "sonic burst"
+  electronics (gadget, caricabatterie, hub USB)   → "energy burst neutro"
+  security (allarmi, telecamere, GPS, lucchetti smart) → "radar scan"
+  beauty / skincare / cosmesi                     → "crystal bloom"
+  fitness / sport / outdoor attivo                → "kinetic burst"
+  smart-home (IoT, app-connected, voice assistant) → "tech grid"
+  precision tools (utensili, misuratori, laser)   → "laser focus"
+  ambient / lighting (lampade, LED, candele)      → "nebula glow"
+  networking (router, switch, NAS)                → "circuit pulse"
+  optics / cameras / binoculars                   → "prism split"
+  home / hardware / ferramenta / arredo / maniglie / serrature passive / pomelli → "metallic shine"
+  furniture / accessori casa / decor / kitchen non-elettrico → "warm halo"
+  clothing / textile / lifestyle / outdoor passivo → "natural bokeh"
+  food / beverage / kitchen consumables           → "warm halo"
+  unknown / other                                 → "minimal studio"
+
+If unsure between two, pick the LESS tech-looking option. "minimal studio" is always safe.
 
 Required JSON structure:
 {
   "product_name_full": "full product name with model number",
   "product_visual_description": "detailed Italian visual description (120+ words): materials, colors (with LAB/hex), geometry, proportions, surface finishes, visible components. Zero marketing language.",
-  "product_category": "audio | electronics | tech | home | fitness | beauty | food | security | clothing | accessories | other",
-  "categoria_effetto_01b": "choose: sonic burst (audio), energy burst neutro (compact electronics), radar scan (security/GPS), crystal bloom (beauty/skincare), kinetic burst (fitness/sport), tech grid (smart home/IoT), laser focus (precision tools), nebula glow (ambient/lighting), circuit pulse (networking), prism split (optics/cameras)",
+  "product_category": "audio | electronics | tech | home | hardware | furniture | fitness | beauty | food | security | clothing | accessories | lighting | optics | networking | other",
+  "categoria_effetto_01b": "one of: sonic burst | energy burst neutro | radar scan | crystal bloom | kinetic burst | tech grid | laser focus | nebula glow | circuit pulse | prism split | warm halo | natural bokeh | metallic shine | minimal studio (follow the strict mapping above)",
   "accent_color_hex": "#XXXXXX",
   "palette_sfondo_hex": ["#050505–#1A1A2E range dark1", "dark2", "dark3"],
   "benefit_headline": "MAIN SELLING HEADLINE — ALL CAPS Italian, max 4 words",
@@ -243,6 +304,20 @@ def _build_global_rule(product_name: str, accent: str) -> str:
         f"NEVER write the text 'LOGO', 'BRAND', 'PLACEHOLDER', or similar AS TEXT in the image.\n"
         f"\n"
         f"ALL TEXT IN IMAGES MUST BE IN ITALIAN.\n"
+        f"\n"
+        f"TEXT RENDERING RULES — CRITICAL:\n"
+        f"1. Render text EXACTLY as specified in the prompt — character by character, "
+        f"no autocomplete, no synonym substitution, no language drift.\n"
+        f"2. NEVER invent words. If a label is not in the prompt, do not add one.\n"
+        f"3. Spell every Italian word correctly. Double-check letters before rendering.\n"
+        f"4. If you cannot render a string clearly and legibly at full resolution, "
+        f"OMIT IT rather than render a garbled version.\n"
+        f"5. NO Lorem Ipsum. NO placeholder text. NO duplicated words.\n"
+        f"6. NO text touching or overlapping the product.\n"
+        f"7. Use ONE font family across the whole image: modern bold sans-serif "
+        f"(geometric, similar to Inter / Manrope / Helvetica Now).\n"
+        f"8. Kerning must be tight and consistent. No floating letters.\n"
+        f"\n"
         f"Output: 2000x2000px | 1:1 | JPEG.\n"
         f"Font: modern bold sans-serif."
     )
@@ -703,7 +778,12 @@ async def generate_mariano_prompts(
             "No placeholder text like 'LOGO HERE', '[BRAND]', 'LOGO CLIENTE', 'YOUR LOGO', 'BRAND HERE'. "
             "No empty rectangular or circular space intentionally left blank for a logo. "
             "No watermarks, no signatures, no trademark symbols. "
-            "Do not write the word 'LOGO' anywhere in the image."
+            "Do not write the word 'LOGO' anywhere in the image. "
+            "No misspelled words. No garbled or duplicated letters. No nonsense or invented words. "
+            "No Lorem Ipsum. No filler text. No partially-rendered or cut-off text. "
+            "No mixed-font typography — only one modern bold sans-serif family across the image. "
+            "No tech-grid or circuit-pattern visual effects on products that are not consumer electronics. "
+            "No smart-home or IoT aesthetic on furniture, hardware, decor, food, or fashion items."
         ),
         "_analysis": a,
     }

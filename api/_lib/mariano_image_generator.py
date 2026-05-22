@@ -38,15 +38,15 @@ def _pil_from_bytes(data: bytes) -> Image.Image:
     return Image.open(io.BytesIO(data)).convert("RGB")
 
 
-async def _generate_gemini(prompt: str, ref_pils: list, slide_num: str) -> bytes:
-    """Call Gemini with reference images + prompt, return PNG bytes."""
+async def _generate_gemini(prompt: str, ref_pils: list, slide_num: str, model_id: str) -> bytes:
+    """Call Gemini (specified model) with reference images + prompt, return PNG bytes."""
     loop = asyncio.get_event_loop()
 
     def _call():
         client = _gemini_client()
         contents = (ref_pils[:2] + [prompt]) if ref_pils else [prompt]
         resp = client.models.generate_content(
-            model=cfg.NB2_MODEL,
+            model=model_id,
             contents=contents,
             config=google_genai_types.GenerateContentConfig(
                 response_modalities=["IMAGE", "TEXT"],
@@ -58,7 +58,7 @@ async def _generate_gemini(prompt: str, ref_pils: list, slide_num: str) -> bytes
                 inline = getattr(part, "inline_data", None)
                 if inline and getattr(inline, "data", None):
                     return inline.data
-        raise ValueError(f"Slide {slide_num}: Gemini returned no image")
+        raise ValueError(f"Slide {slide_num}: {model_id} returned no image")
 
     last_err: Exception | None = None
     for attempt in range(2):
@@ -130,30 +130,45 @@ async def generate_one(
     prompt    = img_data["prompt"]
     name      = img_data["name"]
 
-    # Try Gemini first, fall back to OpenAI
-    try:
-        img_bytes = await _generate_gemini(prompt, ref_pils, slide_num)
-        return {
-            "number": slide_num, "name": name,
-            "image_b64": base64.b64encode(img_bytes).decode(),
-            "mime": "image/png", "error": None, "model": "gemini"
-        }
-    except Exception as gemini_err:
+    # Cascade: Gemini Pro (best text) → Gemini Flash (faster fallback) → OpenAI (last resort)
+    errors: list[str] = []
+    cascade = [
+        ("gemini-pro",   cfg.NB2_MODEL),          # default: gemini-3-pro-image-preview
+        ("gemini-flash", cfg.NB_FALLBACK_MODEL),  # default: gemini-2.5-flash-image
+    ]
+    # Avoid duplicate calls if user override made Pro == Flash
+    seen: set[str] = set()
+    for label, model_id in cascade:
+        if model_id in seen:
+            continue
+        seen.add(model_id)
         try:
-            ref = ref_bytes_list[0] if ref_bytes_list else None
-            img_bytes = await _generate_openai(prompt, ref, slide_num)
+            img_bytes = await _generate_gemini(prompt, ref_pils, slide_num, model_id)
             return {
                 "number": slide_num, "name": name,
                 "image_b64": base64.b64encode(img_bytes).decode(),
-                "mime": "image/png", "error": None, "model": "openai"
+                "mime": "image/png", "error": None, "model": label,
             }
-        except Exception as oai_err:
-            return {
-                "number": slide_num, "name": name,
-                "image_b64": None, "mime": None,
-                "error": f"Gemini: {gemini_err} | OpenAI: {oai_err}",
-                "model": None
-            }
+        except Exception as e:
+            errors.append(f"{label} ({model_id}): {e}")
+
+    # Final fallback: OpenAI
+    try:
+        ref = ref_bytes_list[0] if ref_bytes_list else None
+        img_bytes = await _generate_openai(prompt, ref, slide_num)
+        return {
+            "number": slide_num, "name": name,
+            "image_b64": base64.b64encode(img_bytes).decode(),
+            "mime": "image/png", "error": None, "model": "openai",
+        }
+    except Exception as oai_err:
+        errors.append(f"openai: {oai_err}")
+        return {
+            "number": slide_num, "name": name,
+            "image_b64": None, "mime": None,
+            "error": " | ".join(errors),
+            "model": None,
+        }
 
 
 async def generate_all(
