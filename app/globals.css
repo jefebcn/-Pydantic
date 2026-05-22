@@ -187,6 +187,29 @@ h1, h2, h3, h4, h5, h6 {
   background-size: 200% auto;
 }
 
+/* Skeleton loader shimmer (used while AI generates content) */
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.55; }
+}
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255,255,255,0.04) 0%,
+    rgba(139,92,246,0.10) 50%,
+    rgba(255,255,255,0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.6s linear infinite;
+}
+.skeleton-pulse {
+  animation: skeleton-pulse 1.8s ease-in-out infinite;
+}
+
 /* Premium card variant for step content */
 .card-step {
   background: linear-gradient(180deg, rgba(19, 19, 42, 0.85), rgba(13, 13, 30, 0.95));

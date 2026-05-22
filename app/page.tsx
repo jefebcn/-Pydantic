@@ -1,5 +1,5 @@
 "use client";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -25,6 +25,24 @@ interface GeneratedImage {
 
 type StepStatus = "locked" | "active" | "done";
 
+const RECENT_KEY = "recent_asins_v1";
+const MAX_RECENTS = 5;
+const ASIN_RE = /^[A-Z0-9]{10}$/;
+
+/**
+ * Extract a clean 10-char ASIN from a user paste. Accepts:
+ *   - bare ASIN: "B08N5WRWNW"
+ *   - Amazon URL: ".../dp/B08N5WRWNW/...", ".../gp/product/B08N5WRWNW/..."
+ *   - Anything else: returns the first 10 alphanumeric chars uppercased
+ */
+function extractAsin(raw: string): string {
+  const trimmed = raw.trim();
+  const urlMatch = trimmed.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})/i);
+  if (urlMatch) return urlMatch[1].toUpperCase();
+  const cleaned = trimmed.replace(/[^A-Z0-9]/gi, "").toUpperCase();
+  return cleaned.slice(0, 10);
+}
+
 /* ────────────────────────────────────────────────────────────────────────────
  *  Main page
  * ────────────────────────────────────────────────────────────────────────── */
@@ -46,8 +64,68 @@ export default function HomePage() {
 
   /* UI */
   const [expandedImg, setExpandedImg]             = useState<string | null>(null);
+  const [lightboxIdx, setLightboxIdx]             = useState<number | null>(null);
+  const [recentAsins, setRecentAsins]             = useState<string[]>([]);
+
+  /* Refs for smooth auto-scroll */
+  const step2Ref = useRef<HTMLElement | null>(null);
+  const step3Ref = useRef<HTMLElement | null>(null);
 
   const validImages = generatedImages.filter(i => i.image_b64);
+
+  /* ── Load recents from localStorage ───────────────────────────────────── */
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(RECENT_KEY);
+      if (raw) {
+        const arr = JSON.parse(raw);
+        if (Array.isArray(arr)) setRecentAsins(arr.filter(x => typeof x === "string" && ASIN_RE.test(x)).slice(0, MAX_RECENTS));
+      }
+    } catch { /* no-op */ }
+  }, []);
+
+  const pushRecent = useCallback((value: string) => {
+    if (!ASIN_RE.test(value)) return;
+    setRecentAsins(prev => {
+      const next = [value, ...prev.filter(x => x !== value)].slice(0, MAX_RECENTS);
+      try { localStorage.setItem(RECENT_KEY, JSON.stringify(next)); } catch { /* no-op */ }
+      return next;
+    });
+  }, []);
+
+  /* ── Smooth auto-scroll when a step unlocks ───────────────────────────── */
+  const didScrollStep2 = useRef(false);
+  const didScrollStep3 = useRef(false);
+  useEffect(() => {
+    if (marianoResult && !didScrollStep2.current && step2Ref.current) {
+      didScrollStep2.current = true;
+      step2Ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (!marianoResult) didScrollStep2.current = false;
+  }, [marianoResult]);
+  useEffect(() => {
+    if (validImages.length > 0 && !didScrollStep3.current && step3Ref.current) {
+      didScrollStep3.current = true;
+      step3Ref.current.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+    if (validImages.length === 0) didScrollStep3.current = false;
+  }, [validImages.length]);
+
+  /* ── Keyboard shortcuts (ESC closes overlays) ─────────────────────────── */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (lightboxIdx !== null) { setLightboxIdx(null); return; }
+        if (expandedImg) { setExpandedImg(null); return; }
+      }
+      if (lightboxIdx !== null) {
+        if (e.key === "ArrowRight") setLightboxIdx(i => (i === null ? null : Math.min(validImages.length - 1, i + 1)));
+        if (e.key === "ArrowLeft")  setLightboxIdx(i => (i === null ? null : Math.max(0, i - 1)));
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxIdx, expandedImg, validImages.length]);
 
   /* ── Step status ──────────────────────────────────────────────────────── */
   const s1: StepStatus = marianoResult ? "done" : (marianoLoading ? "active" : "active");
@@ -75,6 +153,7 @@ export default function HomePage() {
       const data = await res.json();
       if (!res.ok) { setMarianoError(data.error || `HTTP ${res.status}`); return; }
       setMarianoResult(data as MarianoResult);
+      pushRecent(asin);
     } catch (err) {
       setMarianoError(err instanceof Error ? err.message : "Errore di rete");
     } finally {
@@ -202,9 +281,18 @@ export default function HomePage() {
               <input
                 type="text"
                 value={asin}
-                onChange={(e) => { setAsin(e.target.value.toUpperCase().slice(0, 10)); setMarianoError(null); }}
-                placeholder="B08N5WRWNW"
-                maxLength={10}
+                onChange={(e) => { setAsin(extractAsin(e.target.value)); setMarianoError(null); }}
+                onPaste={(e) => {
+                  const pasted = e.clipboardData.getData("text");
+                  const extracted = extractAsin(pasted);
+                  if (extracted && extracted !== pasted.trim().toUpperCase()) {
+                    e.preventDefault();
+                    setAsin(extracted);
+                    setMarianoError(null);
+                  }
+                }}
+                placeholder="B08N5WRWNW  oppure  amazon.it/dp/B08N5WRWNW"
+                maxLength={120}
                 spellCheck={false}
                 autoCapitalize="characters"
                 className="w-full px-5 py-4 rounded-xl font-mono text-lg tracking-[0.18em] outline-none transition-all"
@@ -237,6 +325,40 @@ export default function HomePage() {
                 : <span className="flex items-center gap-2"><ArrowRightIcon />Analizza</span>}
             </button>
           </form>
+
+          {recentAsins.length > 0 && (
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-semibold tracking-wider uppercase shrink-0"
+                style={{ color: "var(--text-muted)" }}>
+                Recenti
+              </span>
+              {recentAsins.map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => { setAsin(r); setMarianoError(null); }}
+                  className="text-[11px] font-mono px-2.5 py-1 rounded-md transition-all hover:scale-[1.03]"
+                  style={{
+                    background: asin === r ? "rgba(139,92,246,0.18)" : "rgba(255,255,255,0.04)",
+                    border: asin === r ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.08)",
+                    color: asin === r ? "var(--purple-400)" : "var(--text-muted)",
+                  }}>
+                  {r}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => {
+                  setRecentAsins([]);
+                  try { localStorage.removeItem(RECENT_KEY); } catch { /* no-op */ }
+                }}
+                title="Cancella ASIN recenti"
+                className="text-[10px] px-1.5 py-1 rounded-md opacity-50 hover:opacity-100 transition-opacity"
+                style={{ color: "var(--text-muted)" }}>
+                ✕
+              </button>
+            </div>
+          )}
 
           {marianoError && (
             <div className="mt-3 px-3 py-2 rounded-lg text-xs flex items-start gap-2 fade-up"
@@ -273,9 +395,23 @@ export default function HomePage() {
           num="02"
           title="Verifica prompts.json"
           subtitle="Controlla effetto + palette, poi avvia il rendering delle 10 immagini"
+          sectionRef={step2Ref}
         >
-          {!marianoResult && (
+          {!marianoResult && !marianoLoading && (
             <EmptyHint text="Compila lo step 1 per generare i prompt." />
+          )}
+
+          {!marianoResult && marianoLoading && (
+            <div className="fade-up">
+              <div className="flex items-center gap-3 mb-4 text-sm" style={{ color: "var(--text-muted)" }}>
+                <SpinnerIcon /> Claude sta analizzando il prodotto…
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <SkeletonCard key={i} delay={i * 70} />
+                ))}
+              </div>
+            </div>
           )}
 
           {marianoResult && (
@@ -481,16 +617,24 @@ export default function HomePage() {
           status={s3}
           num="03"
           title="Scarica le immagini"
-          subtitle="Click su una per il download singolo, o ZIP per averle tutte"
+          subtitle="Click su un'immagine per ingrandirla, ZIP per scaricarle tutte"
+          sectionRef={step3Ref}
         >
-          {validImages.length === 0 && (
-            <EmptyHint
-              text={
-                imgGenLoading
-                  ? "Rendering in corso, le immagini compariranno qui appena pronte."
-                  : "Completa lo step 2 per generare le 10 immagini."
-              }
-            />
+          {validImages.length === 0 && !imgGenLoading && (
+            <EmptyHint text="Completa lo step 2 per generare le 10 immagini." />
+          )}
+
+          {validImages.length === 0 && imgGenLoading && (
+            <div className="fade-up">
+              <div className="flex items-center gap-3 mb-4 text-sm" style={{ color: "var(--text-muted)" }}>
+                <SpinnerIcon /> Rendering in corso · Nano Banana sta generando 10 immagini in parallelo…
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                {Array.from({ length: 10 }).map((_, i) => (
+                  <SkeletonThumb key={i} delay={i * 80} />
+                ))}
+              </div>
+            </div>
           )}
 
           {validImages.length > 0 && (
@@ -525,14 +669,20 @@ export default function HomePage() {
               )}
 
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-                {generatedImages.map((img) => (
-                  <ImageThumb
-                    key={img.number}
-                    img={img}
-                    accent={marianoResult?.accent_color_hex ?? "var(--purple-400)"}
-                    onDownload={() => downloadOne(img)}
-                  />
-                ))}
+                {generatedImages.map((img, idx) => {
+                  const validIdx = validImages.findIndex(v => v.number === img.number);
+                  return (
+                    <ImageThumb
+                      key={img.number}
+                      img={img}
+                      accent={marianoResult?.accent_color_hex ?? "var(--purple-400)"}
+                      onClick={() => {
+                        if (img.image_b64 && validIdx >= 0) setLightboxIdx(validIdx);
+                      }}
+                      onDownload={() => downloadOne(img)}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -540,7 +690,28 @@ export default function HomePage() {
 
         <footer className="mt-12 pt-6 text-xs text-center" style={{ color: "var(--text-muted)", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
           Claude Haiku 4.5 · Nano Banana Pro · Flash · GPT Image · Supabase cache
+          <span className="block mt-1 opacity-60">
+            <kbd className="px-1 py-0.5 rounded text-[9px]"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>ESC</kbd>
+            {" "}chiude i pannelli — {" "}
+            <kbd className="px-1 py-0.5 rounded text-[9px]"
+              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>← →</kbd>
+            {" "}navigano nelle immagini
+          </span>
         </footer>
+
+        {lightboxIdx !== null && validImages[lightboxIdx] && (
+          <Lightbox
+            img={validImages[lightboxIdx]}
+            index={lightboxIdx}
+            total={validImages.length}
+            accent={marianoResult?.accent_color_hex ?? "#A78BFA"}
+            onClose={() => setLightboxIdx(null)}
+            onPrev={() => setLightboxIdx(i => (i === null ? null : Math.max(0, i - 1)))}
+            onNext={() => setLightboxIdx(i => (i === null ? null : Math.min(validImages.length - 1, i + 1)))}
+            onDownload={() => downloadOne(validImages[lightboxIdx])}
+          />
+        )}
     </main>
   );
 }
@@ -595,16 +766,18 @@ function Step({
   title,
   subtitle,
   children,
+  sectionRef,
 }: {
   status: StepStatus;
   num: string;
   title: string;
   subtitle: string;
   children: React.ReactNode;
+  sectionRef?: React.RefObject<HTMLElement | null>;
 }) {
   const cls = `card-step p-6 md:p-8 mb-6 ${status === "active" ? "active" : status === "locked" ? "locked" : ""}`;
   return (
-    <section className={cls}>
+    <section ref={sectionRef} className={cls} style={{ scrollMarginTop: "5rem" }}>
       <div className="flex items-start gap-4 mb-5">
         <span className="text-2xl md:text-3xl font-mono font-black leading-none mt-0.5"
           style={{
@@ -644,10 +817,11 @@ function EmptyHint({ text }: { text: string }) {
 }
 
 function ImageThumb({
-  img, accent, onDownload,
+  img, accent, onClick, onDownload,
 }: {
   img: GeneratedImage;
   accent: string;
+  onClick: () => void;
   onDownload: () => void;
 }) {
   return (
@@ -656,23 +830,31 @@ function ImageThumb({
         style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
         {img.image_b64 ? (
           <button
-            onClick={onDownload}
+            onClick={onClick}
             className="w-full h-full group relative"
-            title={`Scarica ${img.name}`}
+            title={`Ingrandisci ${img.name}`}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`data:${img.mime ?? "image/png"};base64,${img.image_b64}`}
               alt={img.name}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
             />
-            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+            <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
               style={{ background: "rgba(0,0,0,0.55)" }}>
               <div className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs font-semibold"
-                style={{ background: "rgba(255,255,255,0.12)", color: "white" }}>
-                <DownloadIcon /> Download
+                style={{ background: "rgba(255,255,255,0.14)", color: "white", backdropFilter: "blur(6px)" }}>
+                <ExpandIcon /> Apri
               </div>
             </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); onDownload(); }}
+              className="absolute top-2 right-2 w-7 h-7 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
+              style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", color: "white" }}
+              title="Scarica questa immagine"
+            >
+              <DownloadIcon />
+            </button>
           </button>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2"
@@ -705,6 +887,176 @@ function ImageThumb({
           </span>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ *  Skeleton loaders
+ * ────────────────────────────────────────────────────────────────────────── */
+function SkeletonCard({ delay = 0 }: { delay?: number }) {
+  return (
+    <div
+      className="rounded-xl p-3 skeleton-pulse"
+      style={{
+        background: "rgba(255,255,255,0.025)",
+        border: "1px solid rgba(255,255,255,0.05)",
+        animationDelay: `${delay}ms`,
+      }}>
+      <div className="h-3 w-8 rounded mb-2 skeleton-shimmer" />
+      <div className="h-3 w-3/4 rounded mb-1.5 skeleton-shimmer" />
+      <div className="h-2 w-1/2 rounded skeleton-shimmer" />
+    </div>
+  );
+}
+
+function SkeletonThumb({ delay = 0 }: { delay?: number }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div
+        className="aspect-square rounded-xl skeleton-shimmer skeleton-pulse"
+        style={{
+          background: "rgba(255,255,255,0.04)",
+          border: "1px solid rgba(255,255,255,0.06)",
+          animationDelay: `${delay}ms`,
+        }}
+      />
+      <div className="flex items-center gap-1.5 px-0.5">
+        <div className="h-2.5 w-6 rounded skeleton-shimmer" />
+        <div className="h-2.5 w-16 rounded skeleton-shimmer" />
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────────────
+ *  Lightbox
+ * ────────────────────────────────────────────────────────────────────────── */
+function Lightbox({
+  img, index, total, accent, onClose, onPrev, onNext, onDownload,
+}: {
+  img: GeneratedImage;
+  index: number;
+  total: number;
+  accent: string;
+  onClose: () => void;
+  onPrev: () => void;
+  onNext: () => void;
+  onDownload: () => void;
+}) {
+  const hasPrev = index > 0;
+  const hasNext = index < total - 1;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-10 fade-up"
+      style={{
+        background: "rgba(5,5,12,0.92)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+      }}>
+
+      {/* Top bar */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="absolute top-4 left-4 right-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <span className="text-sm font-mono font-bold shrink-0" style={{ color: accent }}>
+            {img.number}
+          </span>
+          <p className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
+            {img.name}
+          </p>
+          <span className="text-xs font-mono shrink-0" style={{ color: "var(--text-muted)" }}>
+            {index + 1} / {total}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={onDownload}
+            className="px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
+            style={{
+              background: "rgba(139,92,246,0.18)",
+              color: "var(--purple-400)",
+              border: "1px solid rgba(139,92,246,0.3)",
+            }}>
+            <DownloadIcon /> Scarica
+          </button>
+          <button
+            onClick={onClose}
+            title="Chiudi (ESC)"
+            className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
+            style={{
+              background: "rgba(255,255,255,0.06)",
+              color: "var(--text-primary)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}>
+            ✕
+          </button>
+        </div>
+      </div>
+
+      {/* Prev arrow */}
+      {hasPrev && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onPrev(); }}
+          title="Precedente (←)"
+          className="absolute left-3 md:left-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-110"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            color: "var(--text-primary)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            backdropFilter: "blur(6px)",
+          }}>
+          <ChevronLeftIcon />
+        </button>
+      )}
+
+      {/* Next arrow */}
+      {hasNext && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onNext(); }}
+          title="Successiva (→)"
+          className="absolute right-3 md:right-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-110"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            color: "var(--text-primary)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            backdropFilter: "blur(6px)",
+          }}>
+          <ChevronRightIcon />
+        </button>
+      )}
+
+      {/* Image */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative max-w-[min(90vw,900px)] max-h-[85vh] rounded-2xl overflow-hidden"
+        style={{ border: `1px solid ${accent}33`, boxShadow: `0 20px 80px ${accent}22` }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={`data:${img.mime ?? "image/png"};base64,${img.image_b64}`}
+          alt={img.name}
+          className="block w-full h-auto max-h-[85vh] object-contain"
+        />
+      </div>
+
+      {/* Model badge */}
+      {img.model && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-mono px-2 py-1 rounded-md"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            color: "var(--text-muted)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}>
+          generato con {img.model}
+        </div>
+      )}
     </div>
   );
 }
@@ -757,6 +1109,30 @@ function CheckIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+function ExpandIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 3 21 3 21 9" />
+      <polyline points="9 21 3 21 3 15" />
+      <line x1="21" y1="3"  x2="14" y2="10" />
+      <line x1="3"  y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+function ChevronLeftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+function ChevronRightIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 18 15 12 9 6" />
     </svg>
   );
 }
