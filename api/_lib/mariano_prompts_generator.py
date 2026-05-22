@@ -744,11 +744,20 @@ async def generate_mariano_prompts(
     )
     content.append({"type": "text", "text": product_text})
 
+    # Prompt caching: ANALYSIS_SYSTEM_PROMPT is ~1.7K tokens and identical for every
+    # call. Marking it as ephemeral cache makes subsequent reads cost ~10% of normal
+    # input. Costs ~25% more on the FIRST write; break-even after 2 calls.
     response = client.messages.create(
         model=cfg.HAIKU_MODEL,
         max_tokens=4096,
-        system=ANALYSIS_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": content}]
+        system=[
+            {
+                "type": "text",
+                "text": ANALYSIS_SYSTEM_PROMPT,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ],
+        messages=[{"role": "user", "content": content}],
     )
 
     raw = response.content[0].text.strip()

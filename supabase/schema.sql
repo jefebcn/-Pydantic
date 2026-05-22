@@ -56,3 +56,16 @@ CREATE TRIGGER trg_products_updated BEFORE UPDATE ON products
 
 CREATE TRIGGER trg_jobs_updated BEFORE UPDATE ON jobs
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ── Mariano cache (10-image pipeline) ─────────────────────────────────────────
+-- Stores the prompts.json output of /api/generate-mariano per ASIN, so subsequent
+-- generations skip Rainforest + Claude (~$0.028 saved per run).
+CREATE TABLE IF NOT EXISTS mariano_cache (
+  asin          TEXT PRIMARY KEY,
+  prompts_json  JSONB NOT NULL,
+  created_at    TIMESTAMPTZ DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TRIGGER trg_mariano_cache_updated BEFORE UPDATE ON mariano_cache
+  FOR EACH ROW EXECUTE FUNCTION update_updated_at();

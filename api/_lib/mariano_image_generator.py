@@ -120,6 +120,16 @@ async def _generate_openai(prompt: str, ref_bytes: bytes | None, slide_num: str)
     return await loop.run_in_executor(None, _call)
 
 
+# Slides with significant in-image text need the Pro model (better text fidelity).
+# Slides without text (01a, 01b hero shots, 07 lifestyle editorial) can use the faster
+# / cheaper Flash model directly — saves ~25% on Gemini cost per run.
+_TEXT_HEAVY_SLIDES = {"02", "03", "04", "05", "06", "08", "09"}
+
+
+def _is_text_heavy(slide_num: str) -> bool:
+    return str(slide_num).strip().lower() in _TEXT_HEAVY_SLIDES
+
+
 async def generate_one(
     img_data: dict,
     ref_pils: list,
@@ -130,12 +140,20 @@ async def generate_one(
     prompt    = img_data["prompt"]
     name      = img_data["name"]
 
-    # Cascade: Gemini Pro (best text) → Gemini Flash (faster fallback) → OpenAI (last resort)
+    # Cascade strategy depends on text-density of the slide:
+    #  - text-heavy slides → Pro first (best text fidelity), Flash fallback, OpenAI last
+    #  - text-light slides → Flash first (cheaper/faster), Pro fallback, OpenAI last
     errors: list[str] = []
-    cascade = [
-        ("gemini-pro",   cfg.NB2_MODEL),          # default: gemini-3-pro-image-preview
-        ("gemini-flash", cfg.NB_FALLBACK_MODEL),  # default: gemini-2.5-flash-image
-    ]
+    if _is_text_heavy(slide_num):
+        cascade = [
+            ("gemini-pro",   cfg.NB2_MODEL),          # default: gemini-3-pro-image-preview
+            ("gemini-flash", cfg.NB_FALLBACK_MODEL),  # default: gemini-2.5-flash-image
+        ]
+    else:
+        cascade = [
+            ("gemini-flash", cfg.NB_FALLBACK_MODEL),  # default: gemini-2.5-flash-image
+            ("gemini-pro",   cfg.NB2_MODEL),          # default: gemini-3-pro-image-preview
+        ]
     # Avoid duplicate calls if user override made Pro == Flash
     seen: set[str] = set()
     for label, model_id in cascade:

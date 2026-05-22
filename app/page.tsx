@@ -37,6 +37,7 @@ interface MarianoResult {
   palette_sfondo_hex: string[];
   images: Array<{ number: string; name: string; prompt: string; logo_variant: string | null }>;
   negative_prompt: string;
+  _cache_hit?: boolean;
 }
 
 interface GeneratedImage {
@@ -126,7 +127,7 @@ export default function HomePage() {
     a.click();
   };
 
-  const handleMarianoGenerate = async (e: React.FormEvent) => {
+  const handleMarianoGenerate = async (e: React.FormEvent, forceRefresh: boolean = false) => {
     e.preventDefault();
     if (!marianoAsin.match(/^[A-Z0-9]{10}$/)) {
       setMarianoError("ASIN deve essere 10 caratteri alfanumerici");
@@ -139,7 +140,7 @@ export default function HomePage() {
       const res  = await fetch("/api/generate-mariano", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asin: marianoAsin }),
+        body: JSON.stringify({ asin: marianoAsin, force_refresh: forceRefresh }),
       });
       const data = await res.json();
       if (!res.ok) { setMarianoError(data.error || `HTTP ${res.status}`); return; }
@@ -150,6 +151,10 @@ export default function HomePage() {
       setMarianoLoading(false);
     }
   };
+
+  const handleMarianoRefresh = () => handleMarianoGenerate(
+    new Event("submit") as unknown as React.FormEvent, true
+  );
 
   const downloadMarianoJson = () => {
     if (!marianoResult) return;
@@ -290,8 +295,15 @@ export default function HomePage() {
                   boxShadow: `0 0 12px ${marianoResult.accent_color_hex}99`,
                 }} />
                 <div>
-                  <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                  <p className="text-sm font-bold flex items-center gap-2 flex-wrap" style={{ color: "var(--text-primary)" }}>
                     prompts.json generato — {marianoAsin}
+                    {marianoResult._cache_hit && (
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+                        title="Risultato servito da cache (Rainforest + Claude saltati)"
+                        style={{ background: "rgba(74,222,128,0.18)", color: "#4ADE80", border: "1px solid rgba(74,222,128,0.35)" }}>
+                        ⚡ CACHE
+                      </span>
+                    )}
                   </p>
                   <p className="text-xs" style={{ color: "var(--text-muted)" }}>
                     Effetto: <span style={{ color: marianoResult.accent_color_hex }}>{marianoResult.categoria_effetto_01b}</span>
@@ -300,15 +312,30 @@ export default function HomePage() {
                   </p>
                 </div>
               </div>
-              <button onClick={downloadMarianoJson}
-                className="flex items-center gap-2 text-xs px-4 py-2 rounded-lg font-semibold transition-all"
-                style={{
-                  background: "rgba(139,92,246,0.18)",
-                  color: "var(--purple-400)",
-                  border: "1px solid rgba(139,92,246,0.3)",
-                }}>
-                <DownloadIcon /> Download .json
-              </button>
+              <div className="flex items-center gap-2">
+                {marianoResult._cache_hit && (
+                  <button onClick={handleMarianoRefresh}
+                    disabled={marianoLoading}
+                    title="Forza rigenerazione (Rainforest + Claude, nuovo costo)"
+                    className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg font-semibold transition-all"
+                    style={{
+                      background: "rgba(255,255,255,0.05)",
+                      color: "var(--text-muted)",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                    }}>
+                    Rigenera
+                  </button>
+                )}
+                <button onClick={downloadMarianoJson}
+                  className="flex items-center gap-2 text-xs px-4 py-2 rounded-lg font-semibold transition-all"
+                  style={{
+                    background: "rgba(139,92,246,0.18)",
+                    color: "var(--purple-400)",
+                    border: "1px solid rgba(139,92,246,0.3)",
+                  }}>
+                  <DownloadIcon /> Download .json
+                </button>
+              </div>
             </div>
 
             {/* Color palette */}

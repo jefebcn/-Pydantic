@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 from _lib.scraper import scrape_asin
 from _lib.mariano_prompts_generator import generate_mariano_prompts
+from _lib.cache import get_mariano as cache_get, set_mariano as cache_set
 
 import aiohttp
 
@@ -34,7 +35,14 @@ async def _download_image_b64(url: str, session: aiohttp.ClientSession) -> dict 
         return None
 
 
-async def _run(asin: str) -> dict:
+async def _run(asin: str, force_refresh: bool = False) -> dict:
+    # 0. Cache hit? (skips Rainforest + Claude entirely → saves ~$0.028)
+    if not force_refresh:
+        cached = cache_get(asin)
+        if cached:
+            cached["_cache_hit"] = True
+            return cached
+
     # 1. Scrape Amazon
     amazon_data = await scrape_asin(asin)
 
@@ -48,6 +56,10 @@ async def _run(asin: str) -> dict:
 
     # 3. Generate Mariano-style prompts.json
     prompts_json = await generate_mariano_prompts(amazon_data, images_b64)
+
+    # 4. Persist to cache (best-effort, no-op if Supabase not configured)
+    cache_set(asin, prompts_json)
+    prompts_json["_cache_hit"] = False
     return prompts_json
 
 
@@ -56,6 +68,7 @@ class handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         body = json.loads(self.rfile.read(length))
         asin = body.get("asin", "").strip().upper()
+        force_refresh = bool(body.get("force_refresh", False))
 
         if not asin or len(asin) != 10:
             self.send_response(400)
@@ -65,7 +78,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            result = asyncio.run(_run(asin))
+            result = asyncio.run(_run(asin, force_refresh=force_refresh))
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
