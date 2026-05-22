@@ -1,6 +1,7 @@
 "use client";
 import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
+import JSZip from "jszip";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -201,29 +202,40 @@ function HomePageInner() {
     }
   };
 
+  /**
+   * Build the ZIP entirely in the browser. We previously round-tripped the
+   * base64 payload through /api/download-zip but Vercel's 4.5 MB body limit
+   * returns HTTP 413 once you have 10 high-res images (~13 MB base64).
+   * JSZip works directly on the existing base64 data already in memory.
+   */
   const handleDownloadZip = async () => {
     if (!validImages.length || !asin) return;
     setZipLoading(true);
     setZipError(null);
     try {
-      const res = await fetch("/api/download-zip", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asin, images: validImages }),
-      });
-      if (!res.ok) {
-        let msg = `HTTP ${res.status}`;
-        try { const j = await res.json(); msg = j.error || msg; } catch { /* not json */ }
-        setZipError(msg);
-        return;
+      const zip = new JSZip();
+      const used = new Set<string>();
+      for (const img of validImages) {
+        if (!img.image_b64) continue;
+        const ext  = (img.mime ?? "image/png").split("/")[1]?.split(";")[0] || "png";
+        const safe = `${asin}_${img.number}_${img.name}`
+          .replace(/[^a-zA-Z0-9._-]+/g, "_")
+          .slice(0, 120);
+        let name = `${safe}.${ext}`;
+        let i = 2;
+        while (used.has(name)) { name = `${safe}_${i}.${ext}`; i += 1; }
+        used.add(name);
+        zip.file(name, img.image_b64, { base64: true });
       }
-      const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
-      const a    = document.createElement("a");
+      const blob = await zip.generateAsync(
+        { type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }
+      );
+      const url = URL.createObjectURL(blob);
+      const a   = document.createElement("a");
       a.href = url; a.download = `${asin}_infografiche.zip`; a.click();
       URL.revokeObjectURL(url);
     } catch (err) {
-      setZipError(err instanceof Error ? err.message : "Errore di rete");
+      setZipError(err instanceof Error ? err.message : "Errore creazione ZIP");
     } finally {
       setZipLoading(false);
     }
