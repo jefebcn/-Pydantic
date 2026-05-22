@@ -9,8 +9,11 @@ import io
 import os
 from PIL import Image
 
+from .config import cfg
+
 try:
-    import google.generativeai as genai
+    from google import genai as google_genai
+    from google.genai import types as google_genai_types
     GEMINI_AVAILABLE = True
 except ImportError:
     GEMINI_AVAILABLE = False
@@ -22,13 +25,13 @@ except ImportError:
     OPENAI_AVAILABLE = False
 
 
-def _configure_gemini():
+def _gemini_client():
     if not GEMINI_AVAILABLE:
-        raise RuntimeError("google-generativeai not installed")
+        raise RuntimeError("google-genai not installed")
     key = os.environ.get("GOOGLE_AI_API_KEY", "")
     if not key:
         raise RuntimeError("GOOGLE_AI_API_KEY not set")
-    genai.configure(api_key=key)
+    return google_genai.Client(api_key=key)
 
 
 def _pil_from_bytes(data: bytes) -> Image.Image:
@@ -40,22 +43,32 @@ async def _generate_gemini(prompt: str, ref_pils: list, slide_num: str) -> bytes
     loop = asyncio.get_event_loop()
 
     def _call():
-        _configure_gemini()
-        model = genai.GenerativeModel("gemini-2.0-flash-preview-image-generation")
-        # Pass up to 2 reference images then the prompt text
-        content = ref_pils[:2] + [prompt]
-        resp = model.generate_content(
-            content,
-            generation_config=genai.GenerationConfig(
-                response_modalities=["image", "text"]
-            )
+        client = _gemini_client()
+        contents = (ref_pils[:2] + [prompt]) if ref_pils else [prompt]
+        resp = client.models.generate_content(
+            model=cfg.NB2_MODEL,
+            contents=contents,
+            config=google_genai_types.GenerateContentConfig(
+                response_modalities=["IMAGE", "TEXT"],
+            ),
         )
-        for part in resp.parts:
-            if hasattr(part, "inline_data") and part.inline_data:
-                return part.inline_data.data
+        for cand in (resp.candidates or []):
+            content = getattr(cand, "content", None)
+            for part in (getattr(content, "parts", None) or []):
+                inline = getattr(part, "inline_data", None)
+                if inline and getattr(inline, "data", None):
+                    return inline.data
         raise ValueError(f"Slide {slide_num}: Gemini returned no image")
 
-    return await loop.run_in_executor(None, _call)
+    last_err: Exception | None = None
+    for attempt in range(2):
+        try:
+            return await loop.run_in_executor(None, _call)
+        except Exception as e:
+            last_err = e
+            if attempt == 0:
+                await asyncio.sleep(1.5)
+    raise last_err  # type: ignore[misc]
 
 
 async def _generate_openai(prompt: str, ref_bytes: bytes | None, slide_num: str) -> bytes:
@@ -70,32 +83,33 @@ async def _generate_openai(prompt: str, ref_bytes: bytes | None, slide_num: str)
 
     def _call():
         client = openai.OpenAI(api_key=key)
+        model_id = cfg.GPT_IMG_MODEL
 
         if ref_bytes:
-            # Use image edit endpoint with reference photo
             buf = io.BytesIO(ref_bytes)
             buf.name = "product.png"
             resp = client.images.edit(
-                model="gpt-image-1",
+                model=model_id,
                 image=buf,
                 prompt=prompt[:4000],
                 n=1,
                 size="1024x1024",
             )
         else:
+            # gpt-image-1 always returns b64 — `response_format` is rejected
             resp = client.images.generate(
-                model="gpt-image-1",
+                model=model_id,
                 prompt=prompt[:4000],
                 n=1,
                 size="1024x1024",
-                response_format="b64_json",
             )
 
-        b64 = resp.data[0].b64_json
+        item = resp.data[0]
+        b64 = getattr(item, "b64_json", None)
         if b64:
             return base64.b64decode(b64)
 
-        url = resp.data[0].url
+        url = getattr(item, "url", None)
         if url:
             import requests
             r = requests.get(url, timeout=30)

@@ -6,9 +6,13 @@ class Config:
     # Models
     HAIKU_MODEL: str = "claude-haiku-4-5-20251001"
     OPUS_MODEL:  str = "claude-opus-4-7"
-    NB2_MODEL:   str = "gemini-2.5-flash"          # Nano Banana 2
-    NB_PRO_MODEL: str = "gemini-3-pro-image-preview"  # Nano Banana Pro
-    GPT_IMG_MODEL: str = "gpt-image-2-2026-04-21"
+    # Gemini image-output model. With the `google-generativeai` SDK the
+    # production-stable ID for Nano Banana image output is
+    # "gemini-2.5-flash-image-preview". Override at runtime via env if the
+    # SDK or model id changes.
+    NB2_MODEL:   str = os.environ.get("GEMINI_IMAGE_MODEL", "gemini-2.5-flash-image-preview")
+    NB_PRO_MODEL: str = os.environ.get("GEMINI_PRO_IMAGE_MODEL", "gemini-3-pro-image-preview")
+    GPT_IMG_MODEL: str = os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-1")
 
     # QC thresholds
     QC_PASS_THRESHOLD:    int = 90

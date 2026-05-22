@@ -10,7 +10,45 @@ Usage:
 import anthropic
 import json
 import os
+import re
 from .config import cfg
+
+
+def _parse_claude_json(raw: str) -> dict:
+    """Robust JSON extraction from Claude responses.
+
+    Handles three common shapes:
+      - bare JSON object
+      - fenced ```json ... ``` (or plain ``` ... ```)
+      - JSON object surrounded by prose
+    Raises ValueError with the raw payload on failure so the caller can log it.
+    """
+    s = raw.strip()
+
+    # 1. Strip markdown fences if present (any language tag)
+    if s.startswith("```"):
+        # remove first fence line
+        s = s.split("\n", 1)[1] if "\n" in s else s[3:]
+        # remove trailing fence
+        if "```" in s:
+            s = s.rsplit("```", 1)[0]
+        s = s.strip()
+
+    # 2. Try direct parse
+    try:
+        return json.loads(s)
+    except json.JSONDecodeError:
+        pass
+
+    # 3. Extract first balanced {...} block via regex
+    match = re.search(r"\{.*\}", s, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+
+    raise ValueError(f"Could not parse JSON from Claude response. Raw:\n{raw[:2000]}")
 
 # ── Effect library for 01b based on product category ──────────────────────────
 EFFECT_LIBRARY = {
@@ -602,6 +640,12 @@ async def generate_mariano_prompts(
         amazon_data: dict from scraper.scrape_asin()
         images_b64: list of {"data": base64_str, "media_type": "image/jpeg"}
     """
+    if not images_b64:
+        raise RuntimeError(
+            "generate_mariano_prompts: nessuna immagine reference disponibile "
+            "(images_b64 vuoto). Lo scraper non ha restituito immagini valide."
+        )
+
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
 
     # Build Claude message content
@@ -633,12 +677,7 @@ async def generate_mariano_prompts(
     )
 
     raw = response.content[0].text.strip()
-    # Strip markdown fences if present
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-    a = json.loads(raw)
+    a = _parse_claude_json(raw)
 
     accent = a.get("accent_color_hex", "#8B5CF6")
     bg = a.get("palette_sfondo_hex", ["#0A0A0F", "#0D1B3E", "#1A2A5E"])
