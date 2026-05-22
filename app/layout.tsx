@@ -1,7 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk, DM_Sans, DM_Mono } from "next/font/google";
 import Sidebar from "@/components/Sidebar";
 import TopBar from "@/components/TopBar";
+import Footer from "@/components/Footer";
+import CookieBanner from "@/components/CookieBanner";
 import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
@@ -24,8 +26,46 @@ const dmMono = DM_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Amazon Infographic Generator",
-  description: "Genera 7 slide infografiche professionali da un ASIN Amazon in meno di 90 secondi.",
+  title: {
+    default:  "PYDANTIC — Amazon Infographics AI",
+    template: "%s · PYDANTIC",
+  },
+  description: "PYDANTIC: genera 10 infografiche professionali per il tuo listing Amazon partendo da un ASIN — analisi vision, prompts e rendering AI in un unico flusso.",
+  applicationName: "PYDANTIC",
+  appleWebApp: {
+    capable: true,
+    title: "PYDANTIC",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+    address: false,
+    email: false,
+  },
+  manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/apple-touch-icon.png",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
+};
+
+/**
+ * Viewport is locked to make the site behave like an installed app:
+ *   - initialScale 1 + maximumScale 1 + userScalable false → no pinch zoom
+ *   - viewportFit cover → respect safe areas (iOS notch / Android nav bar)
+ *   - themeColor matches the dark background so the OS status bar blends in
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  minimumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#090914",
 };
 
 export default function RootLayout({
@@ -38,7 +78,7 @@ export default function RootLayout({
       lang="it"
       className={`${spaceGrotesk.variable} ${dmSans.variable} ${dmMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex" style={{ background: "var(--bg-base)" }}>
+      <body className="min-h-full flex no-zoom" style={{ background: "var(--bg-base)" }}>
         <AuthProvider>
           <Sidebar />
           <div className="flex-1 min-h-screen overflow-y-auto flex flex-col">
@@ -46,7 +86,9 @@ export default function RootLayout({
             <div className="flex-1">
               {children}
             </div>
+            <Footer />
           </div>
+          <CookieBanner />
         </AuthProvider>
       </body>
     </html>

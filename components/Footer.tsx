@@ -1,0 +1,80 @@
+"use client";
+import Link from "next/link";
+import { useCallback } from "react";
+
+const LEGAL_LINKS = [
+  { href: "/privacy",  label: "Privacy Policy" },
+  { href: "/cookies",  label: "Cookie Policy"  },
+  { href: "/terms",    label: "Termini di Servizio" },
+];
+
+export default function Footer() {
+  /** Re-open the cookie banner (the banner removes itself when accepted,
+   *  this lets the user revoke their choice). */
+  const openCookieSettings = useCallback(() => {
+    try { localStorage.removeItem("cookie_consent_v1"); } catch { /* no-op */ }
+    document.dispatchEvent(new CustomEvent("open-cookie-banner"));
+  }, []);
+
+  const year = new Date().getFullYear();
+
+  return (
+    <footer
+      className="mt-auto px-4 sm:px-6 md:px-10 py-6 md:py-8"
+      style={{
+        background: "rgba(11,11,24,0.6)",
+        borderTop: "1px solid var(--border)",
+        paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
+      }}
+    >
+      <div className="max-w-5xl mx-auto flex flex-col gap-5">
+        {/* Top: brand + nav */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-center gap-2.5">
+            <span
+              className="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-black"
+              style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}>
+              P
+            </span>
+            <div className="leading-tight">
+              <p className="font-black tracking-[0.18em] text-sm gradient-text">PYDANTIC</p>
+              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                Amazon Infographics AI
+              </p>
+            </div>
+          </div>
+
+          <nav className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            {LEGAL_LINKS.map((l) => (
+              <Link key={l.href} href={l.href}
+                className="text-xs transition-colors hover:opacity-100"
+                style={{ color: "var(--text-muted)" }}>
+                {l.label}
+              </Link>
+            ))}
+            <button onClick={openCookieSettings}
+              className="text-xs transition-colors hover:opacity-100"
+              style={{ color: "var(--text-muted)" }}>
+              Preferenze cookie
+            </button>
+          </nav>
+        </div>
+
+        {/* Bottom: legal small print */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-4"
+          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
+            © {year} PYDANTIC · Tutti i diritti riservati.
+            <span className="block sm:inline sm:ml-2 opacity-70">
+              Amazon, ASIN e i relativi loghi sono marchi di Amazon.com, Inc. — questo
+              servizio non è affiliato con Amazon.
+            </span>
+          </p>
+          <p className="text-[10px] font-mono shrink-0" style={{ color: "var(--text-muted)" }}>
+            Built with Claude Haiku · Nano Banana · Next.js
+          </p>
+        </div>
+      </div>
+    </footer>
+  );
+}

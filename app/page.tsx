@@ -263,17 +263,17 @@ function HomePageInner() {
     <main id="generate" className="px-5 md:px-8 pt-6 md:pt-10 pb-16 max-w-5xl mx-auto">
 
         {/* Hero */}
-        <header className="mb-10 md:mb-14">
-          <p className="text-xs font-semibold tracking-[0.18em] uppercase mb-3"
+        <header className="mb-8 md:mb-14">
+          <p className="text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase mb-2 sm:mb-3"
             style={{ color: "var(--purple-400)" }}>
             Amazon · Infografiche AI
           </p>
-          <h1 className="text-4xl md:text-5xl font-bold leading-tight tracking-tight"
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold leading-tight tracking-tight"
             style={{ color: "var(--text-primary)" }}>
             Da ASIN a <span className="gradient-text">10 immagini pronte</span>
             <br className="hidden md:block" /> per il listing.
           </h1>
-          <p className="mt-4 text-sm md:text-base max-w-2xl" style={{ color: "var(--text-muted)" }}>
+          <p className="mt-3 sm:mt-4 text-xs sm:text-sm md:text-base max-w-2xl" style={{ color: "var(--text-muted)" }}>
             Analisi vision del prodotto, generazione dei 10 prompt in stile Mariano,
             poi rendering parallelo con Nano Banana Pro + Flash. Tutto in un flusso a 3 passi.
           </p>

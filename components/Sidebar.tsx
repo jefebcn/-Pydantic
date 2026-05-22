@@ -26,6 +26,7 @@ export default function Sidebar() {
   const { user, signOut, loading } = useAuth();
   const [authOpen, setAuthOpen]   = useState(false);
   const [authTab, setAuthTab]     = useState<"login" | "register">("login");
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   const openLogin    = () => { setAuthTab("login");    setAuthOpen(true); };
   const openRegister = () => { setAuthTab("register"); setAuthOpen(true); };
@@ -42,32 +43,68 @@ export default function Sidebar() {
     return () => document.removeEventListener("open-auth-modal", onOpen);
   }, []);
 
+  /* Mobile drawer toggle from TopBar hamburger */
+  useEffect(() => {
+    const onToggle = () => setMobileOpen(v => !v);
+    document.addEventListener("toggle-sidebar", onToggle);
+    return () => document.removeEventListener("toggle-sidebar", onToggle);
+  }, []);
+
+  /* Close on route change */
+  useEffect(() => { setMobileOpen(false); }, [pathname]);
+
+  /* ESC closes drawer */
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setMobileOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
   const initials = user?.user_metadata?.display_name
     ? (user.user_metadata.display_name as string).slice(0, 2).toUpperCase()
     : user?.email?.slice(0, 2).toUpperCase() ?? "??";
 
   return (
+    <>
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          onClick={() => setMobileOpen(false)}
+          className="md:hidden fixed inset-0 z-40 fade-up"
+          style={{ background: "rgba(5,5,12,0.7)", backdropFilter: "blur(6px)" }}
+          aria-hidden="true"
+        />
+      )}
+
     <aside
-      className="hidden md:flex flex-col w-[220px] min-h-screen shrink-0"
+      className={`flex flex-col w-[260px] md:w-[220px] min-h-screen shrink-0 transition-transform duration-300 ${
+        mobileOpen ? "fixed inset-y-0 left-0 z-50 translate-x-0" : "fixed -translate-x-full md:translate-x-0 md:static md:z-auto"
+      }`}
       style={{
         background: "var(--bg-sidebar)",
         borderRight: "1px solid var(--border)",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
       }}
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b" style={{ borderColor: "var(--border)" }}>
         <div
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-sm font-bold"
-          style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
+          className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-base font-black shrink-0"
+          style={{
+            background: "linear-gradient(135deg, #7C3AED, #EC4899)",
+            boxShadow: "0 0 18px rgba(139,92,246,0.4)",
+          }}
         >
-          AI
+          P
         </div>
-        <div>
-          <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-            Infographic
+        <div className="min-w-0">
+          <p className="text-base font-black leading-none tracking-[0.18em] gradient-text">
+            PYDANTIC
           </p>
-          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-            Amazon Tool
+          <p className="text-[10px] mt-1 tracking-widest uppercase" style={{ color: "var(--text-muted)" }}>
+            Amazon Infographics
           </p>
         </div>
       </div>
@@ -184,8 +221,19 @@ export default function Sidebar() {
         </div>
       </div>
 
+      {/* Close button — mobile only */}
+      <button
+        onClick={() => setMobileOpen(false)}
+        className="md:hidden absolute top-3 right-3 w-8 h-8 rounded-lg flex items-center justify-center"
+        style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+        aria-label="Chiudi menu"
+      >
+        ✕
+      </button>
+
       <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} defaultTab={authTab} />
     </aside>
+    </>
   );
 }
 

@@ -1,0 +1,18 @@
+{
+  "name":             "PYDANTIC — Amazon Infographics AI",
+  "short_name":       "PYDANTIC",
+  "description":      "Genera 10 infografiche professionali Amazon da un ASIN.",
+  "id":               "/",
+  "start_url":        "/",
+  "scope":            "/",
+  "display":          "standalone",
+  "orientation":      "portrait-primary",
+  "background_color": "#090914",
+  "theme_color":      "#090914",
+  "lang":             "it-IT",
+  "categories":       ["productivity", "business", "utilities"],
+  "icons": [
+    { "src": "/favicon.svg",         "sizes": "any",     "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/apple-touch-icon.png","sizes": "180x180", "type": "image/png" }
+  ]
+}

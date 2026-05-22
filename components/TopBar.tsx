@@ -105,27 +105,56 @@ export default function TopBar() {
     }
   };
 
+  /* Mobile menu open dispatcher (listened to by Sidebar) */
+  const openMobileMenu = () => {
+    document.dispatchEvent(new CustomEvent("toggle-sidebar"));
+  };
+
   return (
     <header
-      className="sticky top-0 z-20 flex items-center gap-4 px-6 py-3"
+      className="sticky top-0 z-20 flex items-center gap-3 md:gap-4 px-3 sm:px-4 md:px-6 py-2.5 md:py-3"
       style={{
         background: "rgba(14,14,28,0.90)",
         backdropFilter: "blur(14px)",
         borderBottom: "1px solid var(--border)",
+        paddingTop: "max(0.625rem, env(safe-area-inset-top))",
       }}
     >
-      {/* Brand */}
-      <div className="shrink-0 hidden sm:block">
-        <p className="text-xs font-semibold tracking-wide" style={{ color: "var(--text-muted)" }}>
-          Amazon Infographic AI
-        </p>
-        <p className="text-sm font-bold leading-tight" style={{ color: "var(--text-primary)" }}>
-          {pageLabel}
-        </p>
-      </div>
+      {/* Hamburger (mobile only) */}
+      <button
+        onClick={openMobileMenu}
+        className="md:hidden w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+        style={{ color: "var(--text-primary)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}
+        title="Apri menu"
+        aria-label="Apri menu"
+      >
+        <HamburgerIcon />
+      </button>
 
-      {/* Search */}
-      <form onSubmit={handleSearch} className="flex-1 max-w-sm mx-auto relative">
+      {/* Brand — big PYDANTIC */}
+      <Link href="/" className="shrink-0 flex items-center gap-2.5 group">
+        <span
+          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-base font-black"
+          style={{
+            background: "linear-gradient(135deg, #7C3AED, #EC4899)",
+            boxShadow: "0 0 16px rgba(139,92,246,0.45)",
+          }}
+        >
+          P
+        </span>
+        <div className="leading-tight">
+          <p className="font-black tracking-[0.2em] text-base sm:text-lg gradient-text">
+            PYDANTIC
+          </p>
+          <p className="text-[9px] sm:text-[10px] font-semibold tracking-widest uppercase -mt-0.5"
+            style={{ color: "var(--text-muted)" }}>
+            {pageLabel}
+          </p>
+        </div>
+      </Link>
+
+      {/* Search (desktop only — on mobile the bell already opens recent runs) */}
+      <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-sm mx-auto relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
           <SearchIcon />
         </span>
@@ -133,7 +162,7 @@ export default function TopBar() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Cerca ASIN o job ID…"
+          placeholder="Cerca ASIN o frammento…"
           className="w-full pl-9 pr-4 py-2 text-sm rounded-xl outline-none transition-all"
           style={{
             background: "rgba(255,255,255,0.05)",
@@ -144,6 +173,9 @@ export default function TopBar() {
           onBlur={(e)  => (e.currentTarget.style.borderColor = "var(--border)")}
         />
       </form>
+
+      {/* Spacer for mobile (pushes actions to the right) */}
+      <div className="flex-1 md:hidden" />
 
       {/* Actions */}
       <div className="flex items-center gap-2 shrink-0" ref={panelRef}>
@@ -450,6 +482,15 @@ function BellIcon() {
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
       <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  );
+}
+function HamburgerIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="3" y1="6"  x2="21" y2="6"  />
+      <line x1="3" y1="12" x2="21" y2="12" />
+      <line x1="3" y1="18" x2="21" y2="18" />
     </svg>
   );
 }
