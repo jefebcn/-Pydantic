@@ -69,3 +69,24 @@ CREATE TABLE IF NOT EXISTS mariano_cache (
 
 CREATE TRIGGER trg_mariano_cache_updated BEFORE UPDATE ON mariano_cache
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- ── Mariano runs log ──────────────────────────────────────────────────────────
+-- One row per completed 10-image generation. Populated by
+-- /api/generate_mariano_images.py after the cascade returns. Used by the
+-- homepage TopBar (bell, search) and the /history page.
+CREATE TABLE IF NOT EXISTS mariano_runs (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  asin              TEXT NOT NULL,
+  cache_hit         BOOLEAN DEFAULT FALSE,
+  num_images_ok     INTEGER DEFAULT 0,
+  num_images_failed INTEGER DEFAULT 0,
+  duration_ms       INTEGER,
+  cost_usd          NUMERIC(10,4),
+  accent_color      TEXT,
+  palette_hex       TEXT[],
+  categoria_effetto TEXT,
+  models_used       TEXT[],
+  created_at        TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_mariano_runs_asin    ON mariano_runs(asin);
+CREATE INDEX IF NOT EXISTS idx_mariano_runs_created ON mariano_runs(created_at DESC);

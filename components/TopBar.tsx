@@ -2,24 +2,26 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import type { Job } from "@/lib/types";
 import { useAuth } from "@/lib/auth-context";
+
+/** Mariano run as returned by GET /api/mariano-runs */
+interface MarianoRun {
+  id: string;
+  asin: string;
+  cache_hit: boolean;
+  num_images_ok: number;
+  num_images_failed: number;
+  duration_ms: number | null;
+  cost_usd: number | null;
+  accent_color: string | null;
+  created_at: string;
+}
 
 const PAGE_LABELS: Record<string, string> = {
   "/":        "Dashboard",
   "/history": "Cronologia",
 };
 
-const STATUS_COLOR: Record<string, string> = {
-  queued: "#9CA3AF", scraping: "#38BDF8", mvd: "#A78BFA",
-  generating: "#C084FC", qc: "#FCD34D", compositing: "#FB923C",
-  done: "#34D399", error: "#F87171",
-};
-const STATUS_LABEL: Record<string, string> = {
-  queued: "In coda", scraping: "Scraping", mvd: "Analisi AI",
-  generating: "Generando", qc: "QC", compositing: "Compositing",
-  done: "Completato", error: "Errore",
-};
 
 function relativeTime(iso: string) {
   const m = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
@@ -41,13 +43,14 @@ const API_KEYS = [
 
 export default function TopBar() {
   const [query, setQuery]         = useState("");
-  const [openPanel, setOpenPanel] = useState<"bell" | "settings" | null>(null);
-  const { user } = useAuth();
+  const [openPanel, setOpenPanel] = useState<"bell" | "settings" | "user" | null>(null);
+  const { user, signOut } = useAuth();
   const initials = user?.user_metadata?.display_name
     ? (user.user_metadata.display_name as string).slice(0, 2).toUpperCase()
     : user?.email?.slice(0, 2).toUpperCase() ?? "AI";
-  const [recentJobs, setRecentJobs] = useState<Job[]>([]);
-  const [activeCount, setActiveCount] = useState(0);
+  const [recentRuns, setRecentRuns]   = useState<MarianoRun[]>([]);
+  const [recentLoading, setRecentLoading] = useState(false);
+  const [signOutBusy, setSignOutBusy] = useState(false);
   const pathname = usePathname();
   const router   = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -65,32 +68,40 @@ export default function TopBar() {
     return () => document.removeEventListener("mousedown", onClickOutside);
   }, []);
 
-  /* Fetch recent jobs when bell is opened */
-  const loadRecentJobs = useCallback(async () => {
+  /* Fetch recent Mariano runs when bell is opened */
+  const loadRecentRuns = useCallback(async () => {
+    setRecentLoading(true);
     try {
-      const res  = await fetch("/api/history?limit=8");
+      const res  = await fetch("/api/mariano-runs?limit=8");
       if (!res.ok) return;
       const data = await res.json();
-      const jobs: Job[] = data.jobs ?? [];
-      setRecentJobs(jobs);
-      setActiveCount(jobs.filter((j) => !["done", "error"].includes(j.status)).length);
+      setRecentRuns(data.runs ?? []);
     } catch { /* no-op */ }
+    finally { setRecentLoading(false); }
   }, []);
 
   const handleBellClick = () => {
     if (openPanel === "bell") { setOpenPanel(null); return; }
     setOpenPanel("bell");
-    loadRecentJobs();
+    loadRecentRuns();
   };
 
-  /* Search: ASIN → results page, or navigate to history */
+  /* Search: ASIN or fragment → /history filtered */
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = query.trim().toUpperCase();
-    if (q.length === 10 && /^[A-Z0-9]{10}$/.test(q)) {
-      router.push(`/history?asin=${q}`);
-    } else if (q) {
-      router.push(`/history?asin=${q}`);
+    router.push(q ? `/history?asin=${encodeURIComponent(q)}` : "/history");
+  };
+
+  /* Sign out (if logged in) → close panel + go home */
+  const handleSignOut = async () => {
+    setSignOutBusy(true);
+    try {
+      await signOut();
+      setOpenPanel(null);
+      router.push("/");
+    } finally {
+      setSignOutBusy(false);
     }
   };
 
@@ -178,84 +189,72 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Bell button + dropdown */}
+        {/* Bell button + dropdown — recent Mariano runs */}
         <div className="relative">
-          <div className="relative">
-            <TopBarBtn title="Notifiche" active={openPanel === "bell"} onClick={handleBellClick}>
-              <BellIcon />
-            </TopBarBtn>
-            {activeCount > 0 && (
-              <span
-                className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-black text-white"
-                style={{ background: "#F87171" }}
-              >
-                {activeCount}
-              </span>
-            )}
-          </div>
+          <TopBarBtn title="Run recenti" active={openPanel === "bell"} onClick={handleBellClick}>
+            <BellIcon />
+          </TopBarBtn>
 
           {openPanel === "bell" && (
-            <Dropdown align="right" width={320}>
+            <Dropdown align="right" width={340}>
               <DropdownHeader
-                title="Notifiche"
-                subtitle={`${activeCount} job attivi`}
+                title="Run recenti"
+                subtitle="Le ultime 8 generazioni"
                 action={<Link href="/history" onClick={() => setOpenPanel(null)}
                   className="text-xs" style={{ color: "var(--purple-400)" }}>Vedi tutto</Link>}
               />
-              {recentJobs.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
-                  Nessun job trovato
+              {recentLoading && (
+                <div className="flex flex-col gap-1.5 p-3">
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-12 rounded-lg skeleton-shimmer skeleton-pulse"
+                      style={{ background: "rgba(255,255,255,0.03)", animationDelay: `${i * 80}ms` }} />
+                  ))}
                 </div>
-              ) : (
-                <div className="flex flex-col max-h-72 overflow-y-auto">
-                  {recentJobs.map((job) => {
-                    const color = STATUS_COLOR[job.status] ?? "#9CA3AF";
-                    const isActive = !["done","error"].includes(job.status);
+              )}
+              {!recentLoading && recentRuns.length === 0 && (
+                <div className="px-4 py-8 text-center text-sm" style={{ color: "var(--text-muted)" }}>
+                  <p className="mb-1">Nessun run ancora</p>
+                  <p className="text-xs opacity-70">Genera le tue prime 10 immagini dalla home</p>
+                </div>
+              )}
+              {!recentLoading && recentRuns.length > 0 && (
+                <div className="flex flex-col max-h-80 overflow-y-auto">
+                  {recentRuns.map((run) => {
+                    const accent = run.accent_color || "#A78BFA";
                     return (
-                      <Link
-                        key={job.id}
-                        href={`/results/${job.id}`}
-                        onClick={() => setOpenPanel(null)}
-                        className="flex items-center gap-3 px-4 py-3 transition-all"
+                      <button
+                        key={run.id}
+                        onClick={() => {
+                          setOpenPanel(null);
+                          router.push(`/?asin=${run.asin}`);
+                        }}
+                        className="flex items-center gap-3 px-4 py-3 transition-all text-left"
                         style={{ borderBottom: "1px solid var(--border)" }}
                         onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                       >
-                        {/* Status dot */}
-                        <span className={`w-2 h-2 rounded-full shrink-0 ${isActive ? "animate-pulse" : ""}`}
-                          style={{ background: color }} />
-
+                        <div className="w-7 h-7 rounded-md shrink-0"
+                          style={{ background: accent, boxShadow: `0 0 8px ${accent}66` }} />
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-sm" style={{ color: "var(--text-primary)" }}>
-                              {job.asin}
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="font-mono font-bold text-xs" style={{ color: "var(--text-primary)" }}>
+                              {run.asin}
                             </span>
-                            <span className="text-xs px-1.5 py-0.5 rounded font-medium"
-                              style={{ background: `${color}18`, color }}>
-                              {STATUS_LABEL[job.status] ?? job.status}
-                            </span>
+                            {run.cache_hit && (
+                              <span className="text-[9px] font-mono px-1 rounded"
+                                style={{ background: "rgba(74,222,128,0.15)", color: "#4ADE80" }}>
+                                ⚡
+                              </span>
+                            )}
                           </div>
-                          {isActive && job.current_step && (
-                            <p className="text-xs mt-0.5 truncate" style={{ color: "var(--text-muted)" }}>
-                              {job.current_step}
-                            </p>
-                          )}
-                          {job.status === "done" && (
-                            <p className="text-xs mt-0.5" style={{ color: "#34D399" }}>
-                              {job.slide_urls?.length ?? 0} slide generate ✓
-                            </p>
-                          )}
-                          {job.status === "error" && (
-                            <p className="text-xs mt-0.5 truncate" style={{ color: "#F87171" }}>
-                              {job.error_message?.slice(0, 50)}
-                            </p>
-                          )}
+                          <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                            {run.num_images_ok}/{(run.num_images_ok ?? 0) + (run.num_images_failed ?? 0)} img
+                            {run.cost_usd ? ` · $${run.cost_usd.toFixed(2)}` : ""}
+                            {" · "}{relativeTime(run.created_at)}
+                          </p>
                         </div>
-
-                        <div className="text-xs shrink-0" style={{ color: "var(--text-muted)" }}>
-                          {relativeTime(job.created_at)}
-                        </div>
-                      </Link>
+                        <span className="shrink-0 opacity-40 text-xs" style={{ color: accent }}>→</span>
+                      </button>
                     );
                   })}
                 </div>
@@ -271,20 +270,98 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Avatar pill */}
-        <div
-          className="flex items-center gap-2 px-3 py-1.5 rounded-xl cursor-pointer"
-          style={{ background: "rgba(139,92,246,0.15)", border: "1px solid rgba(139,92,246,0.25)" }}
-        >
-          <div
-            className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-            style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
+        {/* Avatar pill + user dropdown */}
+        <div className="relative">
+          <button
+            onClick={() => setOpenPanel(openPanel === "user" ? null : "user")}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all"
+            style={{
+              background: openPanel === "user" ? "rgba(139,92,246,0.25)" : "rgba(139,92,246,0.15)",
+              border: openPanel === "user" ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(139,92,246,0.25)",
+            }}
+            title={user ? "Account utente" : "Accedi"}
           >
-            {initials}
-          </div>
-          <span className="text-xs font-semibold hidden sm:block" style={{ color: "var(--purple-400)" }}>
-            {user ? (user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "Account") : "Guest"}
-          </span>
+            <div
+              className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white"
+              style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
+            >
+              {initials}
+            </div>
+            <span className="text-xs font-semibold hidden sm:block" style={{ color: "var(--purple-400)" }}>
+              {user ? (user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "Account") : "Guest"}
+            </span>
+          </button>
+
+          {openPanel === "user" && (
+            <Dropdown align="right" width={260}>
+              {user ? (
+                <>
+                  <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                    <div className="flex items-center gap-3 mb-1">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-sm font-bold text-white shrink-0"
+                        style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}>
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                          {(user.user_metadata?.display_name as string) ?? user.email?.split("@")[0] ?? "Account"}
+                        </p>
+                        <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
+                          {user.email}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="p-2">
+                    <Link href="/history"
+                      onClick={() => setOpenPanel(null)}
+                      className="block px-3 py-2 rounded-lg text-sm transition-all"
+                      style={{ color: "var(--text-primary)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      Cronologia run
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      disabled={signOutBusy}
+                      className="w-full text-left px-3 py-2 rounded-lg text-sm transition-all"
+                      style={{ color: "#F87171" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(248,113,113,0.08)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      {signOutBusy ? "Disconnessione…" : "Esci"}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="px-4 py-3" style={{ borderBottom: "1px solid var(--border)" }}>
+                    <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>Modalità ospite</p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      Accedi per sincronizzare i tuoi ASIN su più dispositivi.
+                    </p>
+                  </div>
+                  <div className="p-2">
+                    <button
+                      onClick={() => { setOpenPanel(null); document.dispatchEvent(new CustomEvent("open-auth-modal", { detail: "login" })); }}
+                      className="w-full text-left px-3 py-2 rounded-lg text-sm transition-all font-semibold"
+                      style={{ color: "var(--purple-400)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(139,92,246,0.08)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      Accedi
+                    </button>
+                    <button
+                      onClick={() => { setOpenPanel(null); document.dispatchEvent(new CustomEvent("open-auth-modal", { detail: "register" })); }}
+                      className="w-full text-left px-3 py-2 rounded-lg text-sm transition-all"
+                      style={{ color: "var(--text-primary)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      Registrati
+                    </button>
+                  </div>
+                </>
+              )}
+            </Dropdown>
+          )}
         </div>
       </div>
     </header>

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
@@ -29,6 +29,18 @@ export default function Sidebar() {
 
   const openLogin    = () => { setAuthTab("login");    setAuthOpen(true); };
   const openRegister = () => { setAuthTab("register"); setAuthOpen(true); };
+
+  /* Listen for "open-auth-modal" events from anywhere in the app
+     (e.g. TopBar's user dropdown). */
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const detail = (e as CustomEvent<"login" | "register">).detail;
+      setAuthTab(detail === "register" ? "register" : "login");
+      setAuthOpen(true);
+    };
+    document.addEventListener("open-auth-modal", onOpen);
+    return () => document.removeEventListener("open-auth-modal", onOpen);
+  }, []);
 
   const initials = user?.user_metadata?.display_name
     ? (user.user_metadata.display_name as string).slice(0, 2).toUpperCase()

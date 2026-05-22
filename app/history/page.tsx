@@ -1,54 +1,56 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
-import type { Job } from "@/lib/types";
+import { useSearchParams, useRouter } from "next/navigation";
 
-const STATUS_META: Record<string, { label: string; color: string; bg: string }> = {
-  queued:       { label: "In coda",     color: "#9CA3AF", bg: "rgba(156,163,175,0.12)" },
-  scraping:     { label: "Scraping",    color: "#38BDF8", bg: "rgba(56,189,248,0.12)"  },
-  mvd:          { label: "Analisi AI",  color: "#A78BFA", bg: "rgba(167,139,250,0.12)" },
-  generating:   { label: "Generando",  color: "#C084FC", bg: "rgba(192,132,252,0.12)" },
-  qc:           { label: "QC",          color: "#FCD34D", bg: "rgba(252,211,77,0.12)"  },
-  compositing:  { label: "Compositing",color: "#FB923C", bg: "rgba(251,146,60,0.12)"  },
-  done:         { label: "Completato", color: "#34D399", bg: "rgba(52,211,153,0.12)"  },
-  error:        { label: "Errore",     color: "#F87171", bg: "rgba(248,113,113,0.12)" },
-};
+interface MarianoRun {
+  id: string;
+  asin: string;
+  cache_hit: boolean;
+  num_images_ok: number;
+  num_images_failed: number;
+  duration_ms: number | null;
+  cost_usd: number | null;
+  accent_color: string | null;
+  palette_hex: string[] | null;
+  categoria_effetto: string | null;
+  models_used: string[] | null;
+  created_at: string;
+}
 
 function relativeTime(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff / 60000);
   if (m < 1)  return "adesso";
-  if (m < 60) return `${m} min fa`;
+  if (m < 60) return `${m}m fa`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h} ore fa`;
+  if (h < 24) return `${h}h fa`;
   const d = Math.floor(h / 24);
-  return `${d} giorni fa`;
+  return `${d}g fa`;
 }
 
-function avgQC(scores: Job["qc_scores"]): number | null {
-  const vals = Object.values(scores ?? {}).map((s) => s.avg).filter(Boolean);
-  if (!vals.length) return null;
-  return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-}
+function HistoryPageInner() {
+  const router = useRouter();
+  const sp     = useSearchParams();
+  const urlAsin = sp.get("asin") ?? "";
 
-export default function HistoryPage() {
-  const [jobs, setJobs]       = useState<Job[]>([]);
-  const [total, setTotal]     = useState(0);
+  const [runs, setRuns]       = useState<MarianoRun[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState("");
-  const [search, setSearch]   = useState("");
-  const [filter, setFilter]   = useState("all");
+  const [reason, setReason]   = useState("");
+  const [search, setSearch]   = useState(urlAsin);
 
-  const fetchHistory = useCallback(async (asin = "") => {
+  const fetchRuns = useCallback(async (asin = "") => {
     setLoading(true);
     setError("");
+    setReason("");
     try {
       const qs  = asin ? `&asin=${encodeURIComponent(asin)}` : "";
-      const res = await fetch(`/api/history?limit=100${qs}`);
-      if (!res.ok) throw new Error(await res.text());
+      const res = await fetch(`/api/mariano-runs?limit=100${qs}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setJobs(data.jobs ?? []);
-      setTotal(data.total ?? 0);
+      setRuns(data.runs ?? []);
+      if (data.reason) setReason(data.reason);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Errore sconosciuto");
     } finally {
@@ -56,289 +58,221 @@ export default function HistoryPage() {
     }
   }, []);
 
-  useEffect(() => { fetchHistory(); }, [fetchHistory]);
+  useEffect(() => { fetchRuns(urlAsin); }, [fetchRuns, urlAsin]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchHistory(search);
+    const q = search.trim().toUpperCase();
+    fetchRuns(q);
   };
 
-  const displayed = filter === "all"
-    ? jobs
-    : jobs.filter((j) => j.status === filter);
+  const openInDashboard = (asin: string) => {
+    router.push(`/?asin=${asin}`);
+  };
 
-  const statuses = ["all", "done", "error", "generating", "scraping", "queued"];
+  const totalCost = runs.reduce((s, r) => s + (r.cost_usd ?? 0), 0);
+  const cacheHits = runs.filter(r => r.cache_hit).length;
+  const cacheRate = runs.length > 0 ? Math.round((cacheHits / runs.length) * 100) : 0;
 
   return (
-    <div className="p-6 md:p-10 max-w-5xl mx-auto">
+    <main className="px-5 md:px-8 pt-6 md:pt-10 pb-16 max-w-5xl mx-auto">
 
       {/* Header */}
-      <div className="mb-6">
-        <p className="text-xs font-semibold tracking-widest uppercase mb-1"
+      <header className="mb-8">
+        <p className="text-xs font-semibold tracking-[0.18em] uppercase mb-3"
           style={{ color: "var(--purple-400)" }}>
-          Cronologia
+          Cronologia · Mariano runs
         </p>
-        <h1 className="text-3xl md:text-4xl font-bold" style={{ color: "var(--text-primary)" }}>
-          Tutti gli{" "}
-          <span className="gradient-text">ASIN cercati</span>
+        <h1 className="text-3xl md:text-4xl font-bold tracking-tight"
+          style={{ color: "var(--text-primary)" }}>
+          Tutti gli <span className="gradient-text">ASIN processati</span>
         </h1>
         <p className="mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
-          {total > 0 ? `${total} job totali` : "Nessun job ancora — genera il tuo primo set di slide dalla Dashboard."}
+          {runs.length === 0 && !loading
+            ? "Nessun run ancora. Genera le tue prime 10 immagini dalla home."
+            : `${runs.length} run totali · ${cacheHits} cache hit (${cacheRate}%) · ≈ $${totalCost.toFixed(2)} spesi`}
         </p>
-      </div>
+      </header>
 
-      {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-6">
-        {/* Search */}
-        <form onSubmit={handleSearch} className="flex gap-2 flex-1">
-          <div className="relative flex-1 max-w-xs">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: "var(--text-muted)" }}>
-              <SearchIcon />
-            </span>
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value.toUpperCase())}
-              placeholder="Filtra per ASIN…"
-              maxLength={10}
-              className="w-full pl-9 pr-4 py-2 text-sm rounded-xl font-mono outline-none"
-              style={{
-                background: "var(--bg-card)",
-                border: "1px solid var(--border)",
-                color: "var(--text-primary)",
-              }}
-              onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)")}
-              onBlur={(e)  => (e.currentTarget.style.borderColor = "var(--border)")}
-            />
-          </div>
-          <button type="submit" className="btn-primary text-sm px-4 py-2">
-            Cerca
-          </button>
+      {/* Stats strip */}
+      {runs.length > 0 && (
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          <StatBlock label="Runs" value={runs.length.toString()} accent="var(--purple-400)" />
+          <StatBlock label="Cache hit" value={`${cacheRate}%`} accent="#4ADE80" sub={`${cacheHits}/${runs.length}`} />
+          <StatBlock label="Spesa totale" value={`$${totalCost.toFixed(2)}`} accent="#FCD34D" />
+        </div>
+      )}
+
+      {/* Search */}
+      <form onSubmit={handleSearch} className="mb-6 flex gap-2">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value.toUpperCase().slice(0, 10))}
+            placeholder="Filtra per ASIN…"
+            className="w-full pl-4 pr-9 py-2.5 text-sm rounded-lg outline-none transition-all font-mono"
+            style={{
+              background: "rgba(11,11,24,0.6)",
+              border: "1px solid rgba(139,92,246,0.22)",
+              color: "var(--text-primary)",
+            }}
+          />
           {search && (
-            <button type="button" onClick={() => { setSearch(""); fetchHistory(); }}
-              className="text-sm px-3 py-2 rounded-xl transition-all"
-              style={{ color: "var(--text-muted)", background: "var(--bg-card)", border: "1px solid var(--border)" }}>
+            <button type="button" onClick={() => { setSearch(""); fetchRuns(); }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded flex items-center justify-center text-xs"
+              style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.04)" }}>
               ✕
             </button>
           )}
-        </form>
-
-        {/* Status filter */}
-        <div className="flex gap-1 flex-wrap">
-          {statuses.map((s) => {
-            const meta = STATUS_META[s];
-            const active = filter === s;
-            return (
-              <button key={s} onClick={() => setFilter(s)}
-                className="text-xs px-3 py-1.5 rounded-lg font-medium transition-all"
-                style={{
-                  background: active ? (meta?.bg ?? "rgba(139,92,246,0.2)") : "var(--bg-card)",
-                  color: active ? (meta?.color ?? "var(--purple-400)") : "var(--text-muted)",
-                  border: `1px solid ${active ? (meta?.color ?? "var(--purple-500)") + "55" : "var(--border)"}`,
-                }}>
-                {s === "all" ? "Tutti" : (meta?.label ?? s)}
-              </button>
-            );
-          })}
         </div>
-      </div>
-
-      {/* Refresh */}
-      <div className="flex justify-between items-center mb-3">
-        <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-          {displayed.length} risultati
-        </span>
-        <button onClick={() => fetchHistory(search)}
-          className="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all"
-          style={{ color: "var(--text-muted)", background: "var(--bg-card)", border: "1px solid var(--border)" }}>
-          <RefreshIcon /> Aggiorna
+        <button type="submit"
+          className="btn-primary text-sm"
+          style={{ padding: "0.625rem 1.25rem" }}>
+          Filtra
         </button>
-      </div>
+      </form>
 
-      {/* Content */}
+      {/* State */}
       {loading && (
-        <div className="flex flex-col items-center justify-center py-24 gap-3">
-          <div className="w-8 h-8 rounded-full border-2 animate-spin"
-            style={{ borderColor: "var(--border)", borderTopColor: "var(--purple-500)" }} />
-          <p className="text-sm" style={{ color: "var(--text-muted)" }}>Caricamento…</p>
+        <div className="space-y-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-20 rounded-xl skeleton-shimmer skeleton-pulse"
+              style={{ background: "rgba(255,255,255,0.03)", animationDelay: `${i * 60}ms` }} />
+          ))}
         </div>
       )}
 
-      {error && (
-        <div className="rounded-xl p-4 mb-4 text-sm"
-          style={{ background: "rgba(248,113,113,0.1)", border: "1px solid rgba(248,113,113,0.3)", color: "#F87171" }}>
-          Errore: {error}
+      {!loading && error && (
+        <div className="px-4 py-3 rounded-lg text-sm"
+          style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#FCA5A5" }}>
+          ✕ {error}
         </div>
       )}
 
-      {!loading && !error && displayed.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-24 gap-4">
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: "rgba(139,92,246,0.12)", color: "var(--purple-400)" }}>
-            <EmptyIcon />
-          </div>
-          <div className="text-center">
-            <p className="font-semibold" style={{ color: "var(--text-primary)" }}>Nessun job trovato</p>
-            <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-              {filter !== "all" ? "Prova a cambiare il filtro." : "Genera il tuo primo set di slide dalla Dashboard."}
-            </p>
-          </div>
-          <Link href="/" className="btn-primary text-sm">
-            Vai alla Dashboard
-          </Link>
+      {!loading && !error && runs.length === 0 && (
+        <div className="px-6 py-12 rounded-xl text-center"
+          style={{ background: "rgba(255,255,255,0.015)", border: "1px dashed rgba(255,255,255,0.08)" }}>
+          <p className="text-sm mb-2" style={{ color: "var(--text-primary)" }}>
+            {search ? `Nessun run per "${search}"` : "Nessun run ancora"}
+          </p>
+          <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+            {reason
+              ? <span title={reason}>Supabase: {reason.slice(0, 90)}</span>
+              : <Link href="/" className="underline" style={{ color: "var(--purple-400)" }}>Vai alla home</Link>}
+          </p>
         </div>
       )}
 
-      {!loading && displayed.length > 0 && (
-        <div className="flex flex-col gap-3">
-          {displayed.map((job) => {
-            const meta   = STATUS_META[job.status] ?? STATUS_META.queued;
-            const qc     = avgQC(job.qc_scores);
-            const slides = job.slide_urls?.length ?? 0;
-            const dur    = job.duration_ms ? `${(job.duration_ms / 1000).toFixed(1)}s` : null;
-            const isActive = !["done","error"].includes(job.status);
-
-            return (
-              <div key={job.id}
-                className="relative overflow-hidden rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 transition-all group"
-                style={{
-                  background: "var(--bg-card)",
-                  border: `1px solid var(--border)`,
-                  borderLeft: `3px solid ${meta.color}`,
-                }}>
-
-                {/* ASIN + meta */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-black font-mono text-lg" style={{ color: "var(--text-primary)" }}>
-                      {job.asin}
-                    </span>
-                    {/* Status chip */}
-                    <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold flex items-center gap-1"
-                      style={{ background: meta.bg, color: meta.color }}>
-                      {isActive && (
-                        <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block"
-                          style={{ background: meta.color }} />
-                      )}
-                      {meta.label}
-                    </span>
-                    {job.status === "error" && (
-                      <span className="text-xs" style={{ color: "#F87171" }}>
-                        — {job.error_message?.slice(0, 60)}
-                      </span>
-                    )}
-                  </div>
-
-                  {/* Progress bar (only if active) */}
-                  {isActive && job.progress > 0 && (
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="flex-1 h-1 rounded-full overflow-hidden"
-                        style={{ background: "var(--border)" }}>
-                        <div className="h-full rounded-full progress-shimmer transition-all"
-                          style={{ width: `${job.progress}%` }} />
-                      </div>
-                      <span className="text-xs font-mono" style={{ color: meta.color }}>
-                        {job.progress}%
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Current step */}
-                  {isActive && job.current_step && (
-                    <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                      {job.current_step}
-                    </p>
-                  )}
-
-                  {/* Thumbnail strip */}
-                  {slides > 0 && (
-                    <div className="flex gap-1.5 mt-2">
-                      {job.slide_urls.slice(0, 5).map((url, i) => (
-                        <div key={i}
-                          className="w-8 h-8 rounded overflow-hidden shrink-0"
-                          style={{ border: "1px solid var(--border)" }}>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={url} alt={`slide ${i + 1}`} className="w-full h-full object-cover" />
-                        </div>
-                      ))}
-                      {slides > 5 && (
-                        <div className="w-8 h-8 rounded flex items-center justify-center text-xs font-bold"
-                          style={{ background: "rgba(139,92,246,0.15)", color: "var(--purple-400)", border: "1px solid var(--border-purple)" }}>
-                          +{slides - 5}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                {/* Right side: stats */}
-                <div className="flex sm:flex-col items-center sm:items-end gap-3 sm:gap-1 shrink-0 flex-wrap">
-                  <div className="flex sm:flex-col items-center sm:items-end gap-2 sm:gap-0.5 text-xs"
-                    style={{ color: "var(--text-muted)" }}>
-                    {slides > 0 && (
-                      <span className="font-semibold" style={{ color: "#34D399" }}>
-                        {slides}/7 slide
-                      </span>
-                    )}
-                    {qc !== null && (
-                      <span style={{ color: qc >= 85 ? "#34D399" : qc >= 70 ? "#FCD34D" : "#F87171" }}>
-                        QC {qc}/100
-                      </span>
-                    )}
-                    {dur && <span>{dur}</span>}
-                    <span>{relativeTime(job.created_at)}</span>
-                  </div>
-
-                  {job.status === "done" ? (
-                    <Link href={`/results/${job.id}`}
-                      className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap"
-                      style={{
-                        background: "rgba(167,139,250,0.15)",
-                        color: "var(--purple-400)",
-                        border: "1px solid rgba(167,139,250,0.3)",
-                      }}>
-                      Vedi slide →
-                    </Link>
-                  ) : isActive ? (
-                    <Link href={`/results/${job.id}`}
-                      className="text-xs px-3 py-1.5 rounded-lg font-semibold transition-all whitespace-nowrap"
-                      style={{
-                        background: meta.bg,
-                        color: meta.color,
-                        border: `1px solid ${meta.color}44`,
-                      }}>
-                      Monitora →
-                    </Link>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
+      {/* Results */}
+      {!loading && runs.length > 0 && (
+        <div className="space-y-2">
+          {runs.map((r) => (
+            <RunRow key={r.id} run={r} onOpen={() => openInDashboard(r.asin)} />
+          ))}
         </div>
       )}
+    </main>
+  );
+}
+
+export default function HistoryPage() {
+  return (
+    <Suspense fallback={
+      <main className="px-5 md:px-8 pt-6 pb-16 max-w-5xl mx-auto">
+        <div className="h-20 rounded-xl skeleton-shimmer skeleton-pulse"
+          style={{ background: "rgba(255,255,255,0.03)" }} />
+      </main>
+    }>
+      <HistoryPageInner />
+    </Suspense>
+  );
+}
+
+/* ── Building blocks ─────────────────────────────────────────────────────── */
+
+function StatBlock({ label, value, accent, sub }: { label: string; value: string; accent: string; sub?: string }) {
+  return (
+    <div className="card-step p-4">
+      <p className="text-[10px] font-semibold tracking-wider uppercase mb-1"
+        style={{ color: "var(--text-muted)" }}>{label}</p>
+      <p className="text-xl font-bold leading-none" style={{ color: accent }}>{value}</p>
+      {sub && <p className="text-[10px] mt-1 font-mono" style={{ color: "var(--text-muted)" }}>{sub}</p>}
     </div>
   );
 }
 
-function SearchIcon() {
+function RunRow({ run, onOpen }: { run: MarianoRun; onOpen: () => void }) {
+  const ok       = run.num_images_ok ?? 0;
+  const failed   = run.num_images_failed ?? 0;
+  const total    = ok + failed;
+  const accent   = run.accent_color || "#A78BFA";
+  const cost     = run.cost_usd ?? 0;
+  const duration = run.duration_ms ? (run.duration_ms / 1000).toFixed(1) : null;
+
   return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
-    </svg>
-  );
-}
-function RefreshIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-    </svg>
-  );
-}
-function EmptyIcon() {
-  return (
-    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="9" /><polyline points="12 7 12 12 15 15" />
-    </svg>
+    <button
+      onClick={onOpen}
+      className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.005] flex items-center gap-4 group"
+      style={{
+        background: "rgba(255,255,255,0.025)",
+        border: "1px solid rgba(255,255,255,0.06)",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${accent}55`; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
+    >
+      {/* Color block */}
+      <div className="w-12 h-12 rounded-lg shrink-0"
+        style={{ background: accent, boxShadow: `0 0 18px ${accent}55` }} />
+
+      {/* Body */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <span className="font-mono font-bold text-sm" style={{ color: "var(--text-primary)" }}>
+            {run.asin}
+          </span>
+          {run.cache_hit && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
+              style={{ background: "rgba(74,222,128,0.15)", color: "#4ADE80", border: "1px solid rgba(74,222,128,0.3)" }}>
+              ⚡ CACHE
+            </span>
+          )}
+          {run.categoria_effetto && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full"
+              style={{ background: `${accent}18`, color: accent }}>
+              {run.categoria_effetto}
+            </span>
+          )}
+          {failed > 0 && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
+              style={{ background: "rgba(248,113,113,0.15)", color: "#F87171" }}>
+              {failed} falliti
+            </span>
+          )}
+        </div>
+        <div className="text-xs flex items-center gap-3 flex-wrap" style={{ color: "var(--text-muted)" }}>
+          <span>{ok}/{total} immagini</span>
+          {duration && <span>· {duration}s</span>}
+          {cost > 0 && <span>· ${cost.toFixed(3)}</span>}
+          <span>· {relativeTime(run.created_at)}</span>
+        </div>
+      </div>
+
+      {/* Palette swatches */}
+      {run.palette_hex && run.palette_hex.length > 0 && (
+        <div className="hidden sm:flex gap-1 shrink-0">
+          {run.palette_hex.slice(0, 3).map((c, i) => (
+            <div key={i} className="w-5 h-5 rounded"
+              style={{ background: c, border: "1px solid rgba(255,255,255,0.1)" }} />
+          ))}
+        </div>
+      )}
+
+      {/* Open arrow */}
+      <div className="shrink-0 opacity-40 group-hover:opacity-100 transition-opacity"
+        style={{ color: accent }}>
+        →
+      </div>
+    </button>
   );
 }

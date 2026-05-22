@@ -1,5 +1,6 @@
 "use client";
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -47,8 +48,23 @@ function extractAsin(raw: string): string {
  *  Main page
  * ────────────────────────────────────────────────────────────────────────── */
 export default function HomePage() {
+  return (
+    <Suspense fallback={null}>
+      <HomePageInner />
+    </Suspense>
+  );
+}
+
+function HomePageInner() {
   /* Step 1 — ASIN + prompts.json */
+  const searchParams = useSearchParams();
   const [asin, setAsin]                           = useState("");
+
+  /* Pre-fill from ?asin=B0... (used by TopBar bell, search, /history clicks) */
+  useEffect(() => {
+    const q = (searchParams.get("asin") ?? "").trim().toUpperCase();
+    if (ASIN_RE.test(q)) setAsin(q);
+  }, [searchParams]);
   const [marianoLoading, setMarianoLoading]       = useState(false);
   const [marianoError, setMarianoError]           = useState<string | null>(null);
   const [marianoResult, setMarianoResult]         = useState<MarianoResult | null>(null);
