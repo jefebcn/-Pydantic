@@ -2,6 +2,7 @@
 import { useEffect, useState, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
+import { listRuns, type RunSummary } from "@/lib/imageStore";
 
 interface MarianoRun {
   id: string;
@@ -60,13 +61,35 @@ function HistoryPageInner() {
 
   useEffect(() => { fetchRuns(urlAsin); }, [fetchRuns, urlAsin]);
 
+  /* Local IndexedDB summaries — used to flag "📦 Salvato" rows and to
+     surface runs that were generated in this browser but never reached
+     Supabase (e.g. mariano_runs table not created yet). */
+  const [localRuns, setLocalRuns] = useState<RunSummary[]>([]);
+  useEffect(() => {
+    listRuns().then(setLocalRuns).catch(() => setLocalRuns([]));
+  }, []);
+  const localAsins = new Set(localRuns.map(r => r.asin));
+
+  /* Runs that ONLY exist locally (no row on Supabase yet) — show them on
+     top with a small "locale" tag so the user can still open them. */
+  const cloudAsins   = new Set(runs.map(r => r.asin));
+  const orphanLocals = localRuns.filter(r => !cloudAsins.has(r.asin));
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const q = search.trim().toUpperCase();
     fetchRuns(q);
   };
 
-  const openInDashboard = (asin: string) => {
+  /* Row click → /run/[asin] if we have the images locally, otherwise
+     fall back to the dashboard pre-fill so the user can re-generate. */
+  const openRun = (asin: string) => {
+    if (localAsins.has(asin)) router.push(`/run/${asin}`);
+    else                      router.push(`/?asin=${asin}`);
+  };
+
+  /* Legacy reference kept for stat-block compatibility (unused). */
+  const _openInDashboard = (asin: string) => {
     router.push(`/?asin=${asin}`);
   };
 
@@ -164,11 +187,29 @@ function HistoryPageInner() {
         </div>
       )}
 
-      {/* Results */}
+      {/* Local-only runs (saved on this device, not yet on Supabase) */}
+      {!loading && orphanLocals.length > 0 && (
+        <div className="space-y-2 mb-6">
+          <p className="text-[10px] font-semibold tracking-wider uppercase pl-1"
+            style={{ color: "var(--text-muted)" }}>
+            Salvati solo su questo dispositivo · {orphanLocals.length}
+          </p>
+          {orphanLocals.map((r) => (
+            <LocalRunRow key={r.asin} run={r} onOpen={() => router.push(`/run/${r.asin}`)} />
+          ))}
+        </div>
+      )}
+
+      {/* Cloud results */}
       {!loading && runs.length > 0 && (
         <div className="space-y-2">
           {runs.map((r) => (
-            <RunRow key={r.id} run={r} onOpen={() => openInDashboard(r.asin)} />
+            <RunRow
+              key={r.id}
+              run={r}
+              hasLocal={localAsins.has(r.asin)}
+              onOpen={() => openRun(r.asin)}
+            />
           ))}
         </div>
       )}
@@ -202,7 +243,7 @@ function StatBlock({ label, value, accent, sub }: { label: string; value: string
   );
 }
 
-function RunRow({ run, onOpen }: { run: MarianoRun; onOpen: () => void }) {
+function RunRow({ run, hasLocal, onOpen }: { run: MarianoRun; hasLocal: boolean; onOpen: () => void }) {
   const ok       = run.num_images_ok ?? 0;
   const failed   = run.num_images_failed ?? 0;
   const total    = ok + failed;
@@ -237,6 +278,13 @@ function RunRow({ run, onOpen }: { run: MarianoRun; onOpen: () => void }) {
               ⚡ CACHE
             </span>
           )}
+          {hasLocal && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
+              title="Le immagini sono salvate su questo dispositivo — clic per aprirle senza rigenerare"
+              style={{ background: "rgba(167,139,250,0.15)", color: "var(--purple-400)", border: "1px solid rgba(167,139,250,0.3)" }}>
+              📦 SALVATO
+            </span>
+          )}
           {run.categoria_effetto && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full"
               style={{ background: `${accent}18`, color: accent }}>
@@ -269,6 +317,58 @@ function RunRow({ run, onOpen }: { run: MarianoRun; onOpen: () => void }) {
       )}
 
       {/* Open arrow */}
+      <div className="shrink-0 opacity-40 group-hover:opacity-100 transition-opacity"
+        style={{ color: accent }}>
+        →
+      </div>
+    </button>
+  );
+}
+
+function LocalRunRow({ run, onOpen }: { run: RunSummary; onOpen: () => void }) {
+  const accent = run.meta.accent || "#A78BFA";
+  return (
+    <button
+      onClick={onOpen}
+      className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.005] flex items-center gap-4 group"
+      style={{
+        background: "rgba(167,139,250,0.04)",
+        border: "1px solid rgba(167,139,250,0.18)",
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${accent}55`; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(167,139,250,0.18)"; }}
+    >
+      <div className="w-12 h-12 rounded-lg shrink-0"
+        style={{ background: accent, boxShadow: `0 0 18px ${accent}55` }} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <span className="font-mono font-bold text-sm" style={{ color: "var(--text-primary)" }}>
+            {run.asin}
+          </span>
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
+            style={{ background: "rgba(167,139,250,0.15)", color: "var(--purple-400)", border: "1px solid rgba(167,139,250,0.3)" }}>
+            📦 LOCALE
+          </span>
+          {run.meta.categoria && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full"
+              style={{ background: `${accent}18`, color: accent }}>
+              {run.meta.categoria}
+            </span>
+          )}
+        </div>
+        <div className="text-xs flex items-center gap-3 flex-wrap" style={{ color: "var(--text-muted)" }}>
+          <span>{run.okCount}/{run.totalCount} immagini</span>
+          <span>· salvato {new Date(run.savedAt).toLocaleDateString()}</span>
+        </div>
+      </div>
+      {run.meta.palette && run.meta.palette.length > 0 && (
+        <div className="hidden sm:flex gap-1 shrink-0">
+          {run.meta.palette.slice(0, 3).map((c, i) => (
+            <div key={i} className="w-5 h-5 rounded"
+              style={{ background: c, border: "1px solid rgba(255,255,255,0.1)" }} />
+          ))}
+        </div>
+      )}
       <div className="shrink-0 opacity-40 group-hover:opacity-100 transition-opacity"
         style={{ color: accent }}>
         →

@@ -2,6 +2,9 @@
 import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import JSZip from "jszip";
+import ImageThumb from "@/components/ImageThumb";
+import Lightbox from "@/components/Lightbox";
+import { saveRun } from "@/lib/imageStore";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -194,7 +197,17 @@ function HomePageInner() {
       });
       const data = await res.json();
       if (!res.ok) { setImgGenError(data.error || `HTTP ${res.status}`); return; }
-      setGeneratedImages(data.images ?? []);
+      const imgs = data.images ?? [];
+      setGeneratedImages(imgs);
+
+      /* Persist the run to IndexedDB so /run/[asin] and the history page
+         can show the gallery later without re-running the pipeline. */
+      saveRun(asin, imgs, {
+        accent:      marianoResult.accent_color_hex,
+        palette:     marianoResult.palette_sfondo_hex,
+        categoria:   marianoResult.categoria_effetto_01b,
+        description: marianoResult.product_visual_description,
+      }).catch((e) => console.warn("[imageStore] saveRun failed:", e));
     } catch (err) {
       setImgGenError(err instanceof Error ? err.message : "Errore di rete");
     } finally {
@@ -844,83 +857,8 @@ function EmptyHint({ text }: { text: string }) {
   );
 }
 
-function ImageThumb({
-  img, accent, onClick, onDownload,
-}: {
-  img: GeneratedImage;
-  accent: string;
-  onClick: () => void;
-  onDownload: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <div className="aspect-square rounded-xl overflow-hidden relative"
-        style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
-        {img.image_b64 ? (
-          <button
-            onClick={onClick}
-            className="w-full h-full group relative"
-            title={`Ingrandisci ${img.name}`}
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`data:${img.mime ?? "image/png"};base64,${img.image_b64}`}
-              alt={img.name}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-            />
-            <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-              style={{ background: "rgba(0,0,0,0.55)" }}>
-              <div className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs font-semibold"
-                style={{ background: "rgba(255,255,255,0.14)", color: "white", backdropFilter: "blur(6px)" }}>
-                <ExpandIcon /> Apri
-              </div>
-            </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDownload(); }}
-              className="absolute top-2 right-2 w-7 h-7 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-              style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", color: "white" }}
-              title="Scarica questa immagine"
-            >
-              <DownloadIcon />
-            </button>
-          </button>
-        ) : (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2"
-            style={{ background: "rgba(248,113,113,0.06)" }}>
-            <span style={{ color: "#F87171" }}>✕</span>
-            <p className="text-[10px] text-center leading-tight" style={{ color: "#F87171" }}>
-              {img.error?.slice(0, 60)}
-            </p>
-          </div>
-        )}
-      </div>
-      <div className="flex items-center gap-1.5 px-0.5">
-        <span className="text-[10px] font-mono font-bold" style={{ color: accent }}>
-          {img.number}
-        </span>
-        <span className="text-[10px] truncate" style={{ color: "var(--text-muted)" }}>
-          {img.name}
-        </span>
-        {img.model && (
-          <span className="ml-auto text-[9px] px-1 rounded shrink-0"
-            style={{
-              background: img.model.includes("pro") ? "rgba(139,92,246,0.18)"
-                       : img.model.includes("flash") ? "rgba(56,189,248,0.18)"
-                       : "rgba(255,255,255,0.06)",
-              color: img.model.includes("pro") ? "var(--purple-400)"
-                       : img.model.includes("flash") ? "#38BDF8"
-                       : "var(--text-muted)",
-            }}>
-            {img.model.replace("gemini-", "")}
-          </span>
-        )}
-      </div>
-    </div>
-  );
-}
-
 /* ────────────────────────────────────────────────────────────────────────────
- *  Skeleton loaders
+ *  Skeleton loaders (used while AI generates content)
  * ────────────────────────────────────────────────────────────────────────── */
 function SkeletonCard({ delay = 0 }: { delay?: number }) {
   return (
@@ -953,138 +891,6 @@ function SkeletonThumb({ delay = 0 }: { delay?: number }) {
         <div className="h-2.5 w-6 rounded skeleton-shimmer" />
         <div className="h-2.5 w-16 rounded skeleton-shimmer" />
       </div>
-    </div>
-  );
-}
-
-/* ────────────────────────────────────────────────────────────────────────────
- *  Lightbox
- * ────────────────────────────────────────────────────────────────────────── */
-function Lightbox({
-  img, index, total, accent, onClose, onPrev, onNext, onDownload,
-}: {
-  img: GeneratedImage;
-  index: number;
-  total: number;
-  accent: string;
-  onClose: () => void;
-  onPrev: () => void;
-  onNext: () => void;
-  onDownload: () => void;
-}) {
-  const hasPrev = index > 0;
-  const hasNext = index < total - 1;
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 md:p-10 fade-up"
-      style={{
-        background: "rgba(5,5,12,0.92)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-      }}>
-
-      {/* Top bar */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="absolute top-4 left-4 right-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <span className="text-sm font-mono font-bold shrink-0" style={{ color: accent }}>
-            {img.number}
-          </span>
-          <p className="text-sm font-semibold truncate" style={{ color: "var(--text-primary)" }}>
-            {img.name}
-          </p>
-          <span className="text-xs font-mono shrink-0" style={{ color: "var(--text-muted)" }}>
-            {index + 1} / {total}
-          </span>
-        </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={onDownload}
-            className="px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
-            style={{
-              background: "rgba(139,92,246,0.18)",
-              color: "var(--purple-400)",
-              border: "1px solid rgba(139,92,246,0.3)",
-            }}>
-            <DownloadIcon /> Scarica
-          </button>
-          <button
-            onClick={onClose}
-            title="Chiudi (ESC)"
-            className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
-            style={{
-              background: "rgba(255,255,255,0.06)",
-              color: "var(--text-primary)",
-              border: "1px solid rgba(255,255,255,0.08)",
-            }}>
-            ✕
-          </button>
-        </div>
-      </div>
-
-      {/* Prev arrow */}
-      {hasPrev && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onPrev(); }}
-          title="Precedente (←)"
-          className="absolute left-3 md:left-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-110"
-          style={{
-            background: "rgba(255,255,255,0.06)",
-            color: "var(--text-primary)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            backdropFilter: "blur(6px)",
-          }}>
-          <ChevronLeftIcon />
-        </button>
-      )}
-
-      {/* Next arrow */}
-      {hasNext && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onNext(); }}
-          title="Successiva (→)"
-          className="absolute right-3 md:right-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-110"
-          style={{
-            background: "rgba(255,255,255,0.06)",
-            color: "var(--text-primary)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            backdropFilter: "blur(6px)",
-          }}>
-          <ChevronRightIcon />
-        </button>
-      )}
-
-      {/* Image */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className="relative max-w-[min(90vw,900px)] max-h-[85vh] rounded-2xl overflow-hidden"
-        style={{ border: `1px solid ${accent}33`, boxShadow: `0 20px 80px ${accent}22` }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`data:${img.mime ?? "image/png"};base64,${img.image_b64}`}
-          alt={img.name}
-          className="block w-full h-auto max-h-[85vh] object-contain"
-        />
-      </div>
-
-      {/* Model badge */}
-      {img.model && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-mono px-2 py-1 rounded-md"
-          style={{
-            background: "rgba(255,255,255,0.06)",
-            color: "var(--text-muted)",
-            border: "1px solid rgba(255,255,255,0.08)",
-          }}>
-          generato con {img.model}
-        </div>
-      )}
     </div>
   );
 }
@@ -1137,30 +943,6 @@ function CheckIcon() {
   return (
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
       <polyline points="20 6 9 17 4 12" />
-    </svg>
-  );
-}
-function ExpandIcon() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 3 21 3 21 9" />
-      <polyline points="9 21 3 21 3 15" />
-      <line x1="21" y1="3"  x2="14" y2="10" />
-      <line x1="3"  y1="21" x2="10" y2="14" />
-    </svg>
-  );
-}
-function ChevronLeftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  );
-}
-function ChevronRightIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-      <polyline points="9 18 15 12 9 6" />
     </svg>
   );
 }
