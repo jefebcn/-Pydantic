@@ -62,15 +62,26 @@ export default function Footer() {
         </div>
 
         {/* Bottom: legal small print */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-4"
+        <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 pt-4"
           style={{ borderTop: "1px solid rgba(30,63,217,0.05)" }}>
-          <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
-            © {year} PYDANTIC · Tutti i diritti riservati.
-            <span className="block sm:inline sm:ml-2 opacity-70">
-              Amazon, ASIN e i relativi loghi sono marchi di Amazon.com, Inc. — questo
-              servizio non è affiliato con Amazon.
-            </span>
-          </p>
+          <div className="space-y-2">
+            <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
+              © {year} <span className="font-semibold" style={{ color: "var(--text-primary)" }}>LILLOFIND</span>
+              {" "}· Tutti i diritti riservati.
+              <span className="block sm:inline sm:ml-2 opacity-70">
+                Amazon, ASIN e i relativi loghi sono marchi di Amazon.com, Inc. — questo
+                servizio non è affiliato con Amazon.
+              </span>
+            </p>
+            <ul className="text-[9px] font-mono uppercase tracking-wider space-y-0.5 opacity-80"
+              style={{ color: "var(--text-muted)" }}>
+              <li>LILLOFIND S.R.L.</li>
+              <li>P.IVA IT 12874930963</li>
+              <li>REA MI — 2714501</li>
+              <li>CAP. SOC. €10.000 i.v.</li>
+              <li>TOWER A, THE WALK — JBR, DUBAI, UAE</li>
+            </ul>
+          </div>
           <p className="text-[10px] font-mono shrink-0" style={{ color: "var(--text-muted)" }}>
             Built with Claude Haiku · Nano Banana · Next.js
           </p>
