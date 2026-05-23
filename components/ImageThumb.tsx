@@ -25,7 +25,7 @@ export default function ImageThumb({
   return (
     <div className="flex flex-col gap-1.5">
       <div className="aspect-square rounded-xl overflow-hidden relative"
-        style={{ border: "1px solid rgba(255,255,255,0.08)" }}>
+        style={{ border: "1px solid rgba(30,63,217,0.08)" }}>
         {img.image_b64 ? (
           <button
             onClick={onClick}
@@ -74,9 +74,9 @@ export default function ImageThumb({
         {img.model && (
           <span className="ml-auto text-[9px] px-1 rounded shrink-0"
             style={{
-              background: img.model.includes("pro") ? "rgba(139,92,246,0.18)"
+              background: img.model.includes("pro") ? "rgba(30,63,217,0.18)"
                        : img.model.includes("flash") ? "rgba(56,189,248,0.18)"
-                       : "rgba(255,255,255,0.06)",
+                       : "rgba(30,63,217,0.06)",
               color: img.model.includes("pro") ? "var(--purple-400)"
                        : img.model.includes("flash") ? "#38BDF8"
                        : "var(--text-muted)",

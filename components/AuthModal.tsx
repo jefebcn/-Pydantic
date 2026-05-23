@@ -68,8 +68,8 @@ export default function AuthModal({ open, onClose, defaultTab = "login" }: Props
         className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
         style={{
           background: "#111124",
-          border: "1px solid rgba(139,92,246,0.3)",
-          boxShadow: "0 0 80px rgba(139,92,246,0.15)",
+          border: "1px solid rgba(30,63,217,0.3)",
+          boxShadow: "0 0 80px rgba(30,63,217,0.15)",
         }}
       >
         {/* Header */}
@@ -96,19 +96,19 @@ export default function AuthModal({ open, onClose, defaultTab = "login" }: Props
           </div>
           <button onClick={onClose}
             className="w-7 h-7 rounded-lg flex items-center justify-center text-sm shrink-0 mt-1"
-            style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.06)" }}>
+            style={{ color: "var(--text-muted)", background: "rgba(30,63,217,0.06)" }}>
             ✕
           </button>
         </div>
 
         {/* Tabs */}
         <div className="flex mx-6 mt-4 rounded-xl overflow-hidden"
-          style={{ background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}>
+          style={{ background: "rgba(30,63,217,0.04)", border: "1px solid var(--border)" }}>
           {(["login", "register"] as const).map((t) => (
             <button key={t} onClick={() => setTab(t)}
               className="flex-1 py-2 text-sm font-semibold transition-all rounded-xl"
               style={{
-                background: tab === t ? "rgba(139,92,246,0.2)" : "transparent",
+                background: tab === t ? "rgba(30,63,217,0.2)" : "transparent",
                 color: tab === t ? "var(--purple-400)" : "var(--text-muted)",
               }}>
               {t === "login" ? "Accedi" : "Registrati"}
@@ -178,7 +178,7 @@ const INPUT_STYLE: React.CSSProperties = {
   width: "100%",
   padding: "0.625rem 1rem",
   borderRadius: "0.75rem",
-  background: "rgba(255,255,255,0.05)",
+  background: "rgba(30,63,217,0.05)",
   border: "1px solid var(--border)",
   color: "var(--text-primary)",
   fontSize: "0.875rem",
@@ -194,7 +194,7 @@ function AuthField({ label, children }: { label: string; children: React.ReactEl
       <input
         {...(children.props as React.InputHTMLAttributes<HTMLInputElement>)}
         style={INPUT_STYLE}
-        onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)")}
+        onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(30,63,217,0.5)")}
         onBlur={(e)  => (e.currentTarget.style.borderColor = "var(--border)")}
       />
     </div>

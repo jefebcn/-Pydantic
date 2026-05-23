@@ -90,17 +90,16 @@ export default function Sidebar() {
     >
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b" style={{ borderColor: "var(--border)" }}>
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-base font-black shrink-0"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-icon.svg" alt="" width={40} height={40}
+          className="w-10 h-10 rounded-lg shrink-0"
           style={{
-            background: "linear-gradient(135deg, #7C3AED, #EC4899)",
-            boxShadow: "0 0 18px rgba(139,92,246,0.4)",
-          }}
-        >
-          P
-        </div>
+            border: "1px solid var(--border)",
+            boxShadow: "0 2px 10px rgba(30,63,217,0.10)",
+          }} />
         <div className="min-w-0">
-          <p className="text-base font-black leading-none tracking-[0.18em] gradient-text">
+          <p className="text-base font-black leading-none tracking-[0.18em]"
+            style={{ color: "var(--brand)" }}>
             PYDANTIC
           </p>
           <p className="text-[10px] mt-1 tracking-widest uppercase" style={{ color: "var(--text-muted)" }}>
@@ -128,7 +127,7 @@ export default function Sidebar() {
                       href={href}
                       className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all"
                       style={{
-                        background: active ? "rgba(139,92,246,0.15)" : "transparent",
+                        background: active ? "rgba(30,63,217,0.15)" : "transparent",
                         color: active ? "var(--purple-400)" : "var(--text-muted)",
                         borderLeft: active ? "2px solid var(--purple-500)" : "2px solid transparent",
                       }}
@@ -150,7 +149,7 @@ export default function Sidebar() {
           /* ── Logged in ── */
           <div>
             <div className="flex items-center gap-2.5 px-2 py-2 rounded-xl mb-2"
-              style={{ background: "rgba(139,92,246,0.12)", border: "1px solid rgba(139,92,246,0.25)" }}>
+              style={{ background: "rgba(30,63,217,0.12)", border: "1px solid rgba(30,63,217,0.25)" }}>
               <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white shrink-0"
                 style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}>
                 {initials}
@@ -167,7 +166,7 @@ export default function Sidebar() {
             <button
               onClick={() => signOut()}
               className="w-full text-xs py-1.5 rounded-lg font-medium transition-all"
-              style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}
+              style={{ color: "var(--text-muted)", background: "rgba(30,63,217,0.04)", border: "1px solid var(--border)" }}
               onMouseEnter={(e) => { e.currentTarget.style.color = "#F87171"; e.currentTarget.style.borderColor = "rgba(248,113,113,0.3)"; }}
               onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; e.currentTarget.style.borderColor = "var(--border)"; }}
             >
@@ -185,9 +184,9 @@ export default function Sidebar() {
               disabled={loading}
               className="w-full text-xs py-2 rounded-lg font-bold transition-all"
               style={{
-                background: "rgba(139,92,246,0.18)",
+                background: "rgba(30,63,217,0.18)",
                 color: loading ? "var(--text-muted)" : "var(--purple-400)",
-                border: "1px solid rgba(139,92,246,0.3)",
+                border: "1px solid rgba(30,63,217,0.3)",
                 opacity: loading ? 0.6 : 1,
               }}
             >
@@ -199,7 +198,7 @@ export default function Sidebar() {
               className="w-full text-xs py-2 rounded-lg font-medium transition-all"
               style={{
                 color: "var(--text-muted)",
-                background: "rgba(255,255,255,0.04)",
+                background: "rgba(30,63,217,0.04)",
                 border: "1px solid var(--border)",
                 opacity: loading ? 0.6 : 1,
               }}
@@ -216,7 +215,7 @@ export default function Sidebar() {
       {/* Version */}
       <div className="px-5 pb-4">
         <div className="rounded-lg px-3 py-1.5 text-xs text-center"
-          style={{ background: "rgba(139,92,246,0.08)", color: "var(--text-muted)" }}>
+          style={{ background: "rgba(30,63,217,0.08)", color: "var(--text-muted)" }}>
           v0.1.0 — Preview
         </div>
       </div>
@@ -225,7 +224,7 @@ export default function Sidebar() {
       <button
         onClick={() => setMobileOpen(false)}
         className="md:hidden absolute top-3 right-3 w-8 h-8 rounded-lg flex items-center justify-center"
-        style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+        style={{ background: "rgba(30,63,217,0.05)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
         aria-label="Chiudi menu"
       >
         ✕

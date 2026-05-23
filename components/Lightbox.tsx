@@ -47,9 +47,9 @@ export default function Lightbox({
             onClick={onDownload}
             className="px-3 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all"
             style={{
-              background: "rgba(139,92,246,0.18)",
+              background: "rgba(30,63,217,0.18)",
               color: "var(--purple-400)",
-              border: "1px solid rgba(139,92,246,0.3)",
+              border: "1px solid rgba(30,63,217,0.3)",
             }}>
             <DownloadIcon /> Scarica
           </button>
@@ -58,9 +58,9 @@ export default function Lightbox({
             title="Chiudi (ESC)"
             className="w-9 h-9 rounded-lg flex items-center justify-center transition-all"
             style={{
-              background: "rgba(255,255,255,0.06)",
+              background: "rgba(30,63,217,0.06)",
               color: "var(--text-primary)",
-              border: "1px solid rgba(255,255,255,0.08)",
+              border: "1px solid rgba(30,63,217,0.08)",
             }}>
             ✕
           </button>
@@ -73,9 +73,9 @@ export default function Lightbox({
           title="Precedente (←)"
           className="absolute left-3 md:left-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-110"
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: "rgba(30,63,217,0.06)",
             color: "var(--text-primary)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            border: "1px solid rgba(30,63,217,0.08)",
             backdropFilter: "blur(6px)",
           }}>
           <ChevronLeftIcon />
@@ -88,9 +88,9 @@ export default function Lightbox({
           title="Successiva (→)"
           className="absolute right-3 md:right-8 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full flex items-center justify-center transition-all hover:scale-110"
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: "rgba(30,63,217,0.06)",
             color: "var(--text-primary)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            border: "1px solid rgba(30,63,217,0.08)",
             backdropFilter: "blur(6px)",
           }}>
           <ChevronRightIcon />
@@ -114,9 +114,9 @@ export default function Lightbox({
           onClick={(e) => e.stopPropagation()}
           className="absolute bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-mono px-2 py-1 rounded-md"
           style={{
-            background: "rgba(255,255,255,0.06)",
+            background: "rgba(30,63,217,0.06)",
             color: "var(--text-muted)",
-            border: "1px solid rgba(255,255,255,0.08)",
+            border: "1px solid rgba(30,63,217,0.08)",
           }}>
           generato con {img.model}
         </div>

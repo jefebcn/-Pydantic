@@ -194,7 +194,7 @@ export default function ResultsPage() {
       {!isDone && !isError && (!job.slide_urls || job.slide_urls.length === 0) && (
         <div className="flex flex-col items-center justify-center py-20 gap-4" style={{ color: "var(--text-muted)" }}>
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center"
-               style={{ background: "rgba(139,92,246,0.1)" }}>
+               style={{ background: "rgba(30,63,217,0.1)" }}>
             <SpinnerIcon size={28} color="var(--purple-400)" />
           </div>
           <p className="text-sm">Le slide appariranno man mano che vengono generate...</p>
@@ -211,7 +211,7 @@ function StatusChip({ status }: { status: string }) {
     error:   { bg: "rgba(239,68,68,0.1)",   color: "#f87171", dot: "#ef4444" },
     queued:  { bg: "rgba(107,107,138,0.15)", color: "#9ca3af", dot: "#6b7280" },
   };
-  const style = cfg[status] ?? { bg: "rgba(139,92,246,0.1)", color: "var(--purple-400)", dot: "var(--purple-500)" };
+  const style = cfg[status] ?? { bg: "rgba(30,63,217,0.1)", color: "var(--purple-400)", dot: "var(--purple-500)" };
 
   return (
     <span

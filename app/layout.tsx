@@ -35,7 +35,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     title: "PYDANTIC",
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default",
   },
   formatDetection: {
     telephone: false,
@@ -44,8 +44,12 @@ export const metadata: Metadata = {
   },
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/favicon.svg",
-    apple: "/apple-touch-icon.png",
+    icon: [
+      { url: "/favicon.svg",    type: "image/svg+xml" },
+      { url: "/logo-icon.svg",  type: "image/svg+xml", sizes: "512x512" },
+    ],
+    apple: "/logo-icon.svg",
+    shortcut: "/favicon.svg",
   },
   other: {
     "mobile-web-app-capable": "yes",
@@ -65,7 +69,8 @@ export const viewport: Viewport = {
   minimumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#090914",
+  themeColor: "#FAF3F3",
+  colorScheme: "light",
 };
 
 export default function RootLayout({

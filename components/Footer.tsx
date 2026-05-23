@@ -22,7 +22,7 @@ export default function Footer() {
     <footer
       className="mt-auto px-4 sm:px-6 md:px-10 py-6 md:py-8"
       style={{
-        background: "rgba(11,11,24,0.6)",
+        background: "rgba(255,255,255,0.6)",
         borderTop: "1px solid var(--border)",
         paddingBottom: "max(1.5rem, env(safe-area-inset-bottom))",
       }}
@@ -30,14 +30,14 @@ export default function Footer() {
       <div className="max-w-5xl mx-auto flex flex-col gap-5">
         {/* Top: brand + nav */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-          <div className="flex items-center gap-2.5">
-            <span
-              className="w-7 h-7 rounded-md flex items-center justify-center text-white text-xs font-black"
-              style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}>
-              P
-            </span>
+          <div className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-icon.svg" alt="" width={36} height={36}
+              className="w-9 h-9 rounded-md shrink-0"
+              style={{ border: "1px solid var(--border)" }} />
             <div className="leading-tight">
-              <p className="font-black tracking-[0.18em] text-sm gradient-text">PYDANTIC</p>
+              <p className="font-black tracking-[0.18em] text-sm"
+                style={{ color: "var(--brand)" }}>PYDANTIC</p>
               <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
                 Amazon Infographics AI
               </p>
@@ -62,7 +62,7 @@ export default function Footer() {
 
         {/* Bottom: legal small print */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 pt-4"
-          style={{ borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+          style={{ borderTop: "1px solid rgba(30,63,217,0.05)" }}>
           <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
             © {year} PYDANTIC · Tutti i diritti riservati.
             <span className="block sm:inline sm:ml-2 opacity-70">

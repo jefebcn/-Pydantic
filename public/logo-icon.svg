@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background: pink-tinted off-white matching the original logo card -->
+  <rect width="512" height="512" rx="96" fill="#FAF3F3"/>
+
+  <!-- Robot mascot — Pydantic blue (#1E3FD9) -->
+  <g fill="none" stroke="#1E3FD9" stroke-width="9" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Motion lines (lively) -->
+    <path d="M158 218 l-22 -10"/>
+    <path d="M158 270 l-26 -2"/>
+    <path d="M158 322 l-22 12"/>
+
+    <!-- Body cube (slight perspective) -->
+    <path d="M180 188 L296 178 L344 218 L344 360 L246 372 L180 332 Z" fill="#FFFFFF"/>
+    <!-- Cube top face -->
+    <path d="M180 188 L228 152 L344 162 L296 178 Z" fill="#FFFFFF"/>
+    <!-- Right side highlight -->
+    <path d="M296 178 L296 320 L344 360 L344 218 Z" fill="#FFFFFF"/>
+
+    <!-- Top face decoration: dashboard widgets -->
+    <circle cx="248" cy="172" r="6" fill="#1E3FD9"/>
+    <rect x="270" y="166" width="22" height="10" rx="2" fill="#FFFFFF"/>
+
+    <!-- Front face: bar chart -->
+    <line x1="206" y1="232" x2="206" y2="252"/>
+    <line x1="218" y1="222" x2="218" y2="252"/>
+    <line x1="230" y1="240" x2="230" y2="252"/>
+    <line x1="206" y1="252" x2="234" y2="252"/>
+
+    <!-- Front face: trend line -->
+    <path d="M204 312 L222 296 L240 308 L262 286" fill="none"/>
+
+    <!-- Right face: small widget -->
+    <rect x="312" y="240" width="22" height="22" rx="3" fill="#FFFFFF"/>
+    <path d="M316 252 L322 246 L328 252" fill="none"/>
+
+    <!-- Face: eyes + smile (centered on front face) -->
+    <circle cx="232" cy="270" r="7" fill="#1E3FD9"/>
+    <circle cx="266" cy="268" r="7" fill="#1E3FD9"/>
+    <path d="M226 290 Q250 308 274 288" fill="none" stroke-width="7"/>
+
+    <!-- Arms with thumbs up (both sides) -->
+    <path d="M180 290 Q146 296 138 318 Q134 332 152 336 L162 320" fill="#FFFFFF"/>
+    <circle cx="146" cy="318" r="6" fill="#1E3FD9"/>
+
+    <path d="M344 290 Q374 296 384 316 Q388 330 372 336 L362 320" fill="#FFFFFF"/>
+    <circle cx="372" cy="316" r="6" fill="#1E3FD9"/>
+
+    <!-- Legs -->
+    <path d="M212 372 L212 408 L228 408" fill="#FFFFFF"/>
+    <path d="M276 376 L276 410 L292 410" fill="#FFFFFF"/>
+  </g>
+
+  <!-- Check marks (decoration around the robot) -->
+  <g fill="none" stroke="#1E3FD9" stroke-width="10" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M362 130 L376 148 L400 116"/>
+    <path d="M404 380 L418 398 L444 364"/>
+  </g>
+</svg>

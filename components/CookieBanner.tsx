@@ -52,10 +52,10 @@ export default function CookieBanner() {
         className="mx-auto max-w-3xl rounded-2xl p-4 sm:p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4"
         style={{
           background: "rgba(15,15,30,0.96)",
-          border: "1px solid rgba(139,92,246,0.35)",
+          border: "1px solid rgba(30,63,217,0.35)",
           backdropFilter: "blur(14px)",
           WebkitBackdropFilter: "blur(14px)",
-          boxShadow: "0 12px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(139,92,246,0.1)",
+          boxShadow: "0 12px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(30,63,217,0.1)",
         }}
       >
         <div className="flex-1 min-w-0">
@@ -78,7 +78,7 @@ export default function CookieBanner() {
             onClick={() => choose("essential")}
             className="flex-1 sm:flex-none text-xs font-semibold px-4 py-2.5 rounded-lg transition-all"
             style={{
-              background: "rgba(255,255,255,0.04)",
+              background: "rgba(30,63,217,0.04)",
               color: "var(--text-primary)",
               border: "1px solid rgba(255,255,255,0.1)",
             }}

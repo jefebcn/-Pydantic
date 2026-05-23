@@ -114,7 +114,7 @@ export default function TopBar() {
     <header
       className="sticky top-0 z-20 flex items-center gap-3 md:gap-4 px-3 sm:px-4 md:px-6 py-2.5 md:py-3"
       style={{
-        background: "rgba(14,14,28,0.90)",
+        background: "rgba(250,243,243,0.85)",
         backdropFilter: "blur(14px)",
         borderBottom: "1px solid var(--border)",
         paddingTop: "max(0.625rem, env(safe-area-inset-top))",
@@ -124,26 +124,25 @@ export default function TopBar() {
       <button
         onClick={openMobileMenu}
         className="md:hidden w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
-        style={{ color: "var(--text-primary)", background: "rgba(255,255,255,0.04)", border: "1px solid var(--border)" }}
+        style={{ color: "var(--text-primary)", background: "var(--bg-card)", border: "1px solid var(--border)" }}
         title="Apri menu"
         aria-label="Apri menu"
       >
         <HamburgerIcon />
       </button>
 
-      {/* Brand — big PYDANTIC */}
+      {/* Brand — PYDANTIC logo + wordmark */}
       <Link href="/" className="shrink-0 flex items-center gap-2.5 group">
-        <span
-          className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-base font-black"
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-icon.svg" alt="" width={36} height={36}
+          className="w-9 h-9 rounded-lg shrink-0"
           style={{
-            background: "linear-gradient(135deg, #7C3AED, #EC4899)",
-            boxShadow: "0 0 16px rgba(139,92,246,0.45)",
-          }}
-        >
-          P
-        </span>
+            border: "1px solid var(--border)",
+            boxShadow: "0 2px 10px rgba(30,63,217,0.08)",
+          }} />
         <div className="leading-tight">
-          <p className="font-black tracking-[0.2em] text-base sm:text-lg gradient-text">
+          <p className="font-black tracking-[0.18em] text-base sm:text-lg"
+            style={{ color: "var(--brand)" }}>
             PYDANTIC
           </p>
           <p className="text-[9px] sm:text-[10px] font-semibold tracking-widest uppercase -mt-0.5"
@@ -165,11 +164,11 @@ export default function TopBar() {
           placeholder="Cerca ASIN o frammento…"
           className="w-full pl-9 pr-4 py-2 text-sm rounded-xl outline-none transition-all"
           style={{
-            background: "rgba(255,255,255,0.05)",
+            background: "rgba(30,63,217,0.05)",
             border: "1px solid var(--border)",
             color: "var(--text-primary)",
           }}
-          onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(139,92,246,0.5)")}
+          onFocus={(e) => (e.currentTarget.style.borderColor = "rgba(30,63,217,0.5)")}
           onBlur={(e)  => (e.currentTarget.style.borderColor = "var(--border)")}
         />
       </form>
@@ -196,7 +195,7 @@ export default function TopBar() {
               <div className="flex flex-col gap-2 p-3">
                 {API_KEYS.map((k) => (
                   <div key={k.key} className="flex items-center gap-2.5 p-2.5 rounded-lg"
-                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    style={{ background: "rgba(30,63,217,0.03)", border: "1px solid rgba(30,63,217,0.06)" }}>
                     <span className="w-2 h-2 rounded-full shrink-0"
                       style={{ background: k.color, boxShadow: `0 0 5px ${k.color}88` }} />
                     <div className="flex-1 min-w-0">
@@ -212,7 +211,7 @@ export default function TopBar() {
                   target="_blank"
                   rel="noopener noreferrer"
                   className="block text-center text-xs py-2 rounded-lg font-semibold transition-all"
-                  style={{ background: "rgba(139,92,246,0.18)", color: "var(--purple-400)", border: "1px solid rgba(139,92,246,0.3)" }}
+                  style={{ background: "rgba(30,63,217,0.18)", color: "var(--purple-400)", border: "1px solid rgba(30,63,217,0.3)" }}
                 >
                   Apri Vercel Dashboard →
                 </a>
@@ -239,7 +238,7 @@ export default function TopBar() {
                 <div className="flex flex-col gap-1.5 p-3">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <div key={i} className="h-12 rounded-lg skeleton-shimmer skeleton-pulse"
-                      style={{ background: "rgba(255,255,255,0.03)", animationDelay: `${i * 80}ms` }} />
+                      style={{ background: "rgba(30,63,217,0.03)", animationDelay: `${i * 80}ms` }} />
                   ))}
                 </div>
               )}
@@ -262,7 +261,7 @@ export default function TopBar() {
                         }}
                         className="flex items-center gap-3 px-4 py-3 transition-all text-left"
                         style={{ borderBottom: "1px solid var(--border)" }}
-                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.04)")}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,63,217,0.04)")}
                         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                       >
                         <div className="w-7 h-7 rounded-md shrink-0"
@@ -294,7 +293,7 @@ export default function TopBar() {
               <div className="p-3">
                 <Link href="/history" onClick={() => setOpenPanel(null)}
                   className="block text-center text-xs py-2 rounded-lg font-semibold transition-all"
-                  style={{ background: "rgba(255,255,255,0.05)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
+                  style={{ background: "rgba(30,63,217,0.05)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
                   Cronologia completa
                 </Link>
               </div>
@@ -308,8 +307,8 @@ export default function TopBar() {
             onClick={() => setOpenPanel(openPanel === "user" ? null : "user")}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl transition-all"
             style={{
-              background: openPanel === "user" ? "rgba(139,92,246,0.25)" : "rgba(139,92,246,0.15)",
-              border: openPanel === "user" ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(139,92,246,0.25)",
+              background: openPanel === "user" ? "rgba(30,63,217,0.25)" : "rgba(30,63,217,0.15)",
+              border: openPanel === "user" ? "1px solid rgba(30,63,217,0.4)" : "1px solid rgba(30,63,217,0.25)",
             }}
             title={user ? "Account utente" : "Accedi"}
           >
@@ -349,7 +348,7 @@ export default function TopBar() {
                       onClick={() => setOpenPanel(null)}
                       className="block px-3 py-2 rounded-lg text-sm transition-all"
                       style={{ color: "var(--text-primary)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,63,217,0.05)")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                       Cronologia run
                     </Link>
@@ -377,7 +376,7 @@ export default function TopBar() {
                       onClick={() => { setOpenPanel(null); document.dispatchEvent(new CustomEvent("open-auth-modal", { detail: "login" })); }}
                       className="w-full text-left px-3 py-2 rounded-lg text-sm transition-all font-semibold"
                       style={{ color: "var(--purple-400)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(139,92,246,0.08)")}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,63,217,0.08)")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                       Accedi
                     </button>
@@ -385,7 +384,7 @@ export default function TopBar() {
                       onClick={() => { setOpenPanel(null); document.dispatchEvent(new CustomEvent("open-auth-modal", { detail: "register" })); }}
                       className="w-full text-left px-3 py-2 rounded-lg text-sm transition-all"
                       style={{ color: "var(--text-primary)" }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,0.05)")}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,63,217,0.05)")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
                       Registrati
                     </button>
@@ -415,7 +414,7 @@ function Dropdown({ children, align = "right", width = 260 }: {
         [align === "right" ? "right" : "left"]: 0,
         background: "#111124",
         border: "1px solid var(--border)",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(139,92,246,0.1)",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(30,63,217,0.1)",
       }}
     >
       {children}
@@ -453,8 +452,8 @@ function TopBarBtn({ children, title, active, onClick }: {
       className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
       style={{
         color: active ? "var(--purple-400)" : "var(--text-muted)",
-        background: active ? "rgba(139,92,246,0.15)" : "transparent",
-        border: active ? "1px solid rgba(139,92,246,0.3)" : "1px solid transparent",
+        background: active ? "rgba(30,63,217,0.15)" : "transparent",
+        border: active ? "1px solid rgba(30,63,217,0.3)" : "1px solid transparent",
       }}
     >
       {children}

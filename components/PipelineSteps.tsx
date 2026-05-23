@@ -36,13 +36,13 @@ export default function PipelineSteps({ status }: PipelineStepsProps) {
                 className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-all ${active ? "pulse-purple" : ""}`}
                 style={{
                   background: done
-                    ? "rgba(139,92,246,0.8)"
+                    ? "rgba(30,63,217,0.8)"
                     : active
                     ? "linear-gradient(135deg, #7C3AED, #A855F7)"
                     : "var(--bg-card)",
                   border: pending ? "1px solid var(--border)" : "none",
                   color: done || active ? "white" : "var(--text-muted)",
-                  boxShadow: active ? "0 0 12px rgba(139,92,246,0.6)" : "none",
+                  boxShadow: active ? "0 0 12px rgba(30,63,217,0.6)" : "none",
                 }}
               >
                 {done ? "✓" : i + 1}

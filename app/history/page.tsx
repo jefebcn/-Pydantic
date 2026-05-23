@@ -136,15 +136,15 @@ function HistoryPageInner() {
             placeholder="Filtra per ASIN…"
             className="w-full pl-4 pr-9 py-2.5 text-sm rounded-lg outline-none transition-all font-mono"
             style={{
-              background: "rgba(11,11,24,0.6)",
-              border: "1px solid rgba(139,92,246,0.22)",
+              background: "rgba(255,255,255,0.6)",
+              border: "1px solid rgba(30,63,217,0.22)",
               color: "var(--text-primary)",
             }}
           />
           {search && (
             <button type="button" onClick={() => { setSearch(""); fetchRuns(); }}
               className="absolute right-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded flex items-center justify-center text-xs"
-              style={{ color: "var(--text-muted)", background: "rgba(255,255,255,0.04)" }}>
+              style={{ color: "var(--text-muted)", background: "rgba(30,63,217,0.04)" }}>
               ✕
             </button>
           )}
@@ -161,7 +161,7 @@ function HistoryPageInner() {
         <div className="space-y-2">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="h-20 rounded-xl skeleton-shimmer skeleton-pulse"
-              style={{ background: "rgba(255,255,255,0.03)", animationDelay: `${i * 60}ms` }} />
+              style={{ background: "rgba(30,63,217,0.03)", animationDelay: `${i * 60}ms` }} />
           ))}
         </div>
       )}
@@ -175,7 +175,7 @@ function HistoryPageInner() {
 
       {!loading && !error && runs.length === 0 && (
         <div className="px-6 py-12 rounded-xl text-center"
-          style={{ background: "rgba(255,255,255,0.015)", border: "1px dashed rgba(255,255,255,0.08)" }}>
+          style={{ background: "rgba(255,255,255,0.015)", border: "1px dashed rgba(30,63,217,0.08)" }}>
           <p className="text-sm mb-2" style={{ color: "var(--text-primary)" }}>
             {search ? `Nessun run per "${search}"` : "Nessun run ancora"}
           </p>
@@ -222,7 +222,7 @@ export default function HistoryPage() {
     <Suspense fallback={
       <main className="px-5 md:px-8 pt-6 pb-16 max-w-5xl mx-auto">
         <div className="h-20 rounded-xl skeleton-shimmer skeleton-pulse"
-          style={{ background: "rgba(255,255,255,0.03)" }} />
+          style={{ background: "rgba(30,63,217,0.03)" }} />
       </main>
     }>
       <HistoryPageInner />
@@ -257,10 +257,10 @@ function RunRow({ run, hasLocal, onOpen }: { run: MarianoRun; hasLocal: boolean;
       className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.005] flex items-center gap-4 group"
       style={{
         background: "rgba(255,255,255,0.025)",
-        border: "1px solid rgba(255,255,255,0.06)",
+        border: "1px solid rgba(30,63,217,0.06)",
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${accent}55`; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.06)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(30,63,217,0.06)"; }}
     >
       {/* Color block */}
       <div className="w-12 h-12 rounded-lg shrink-0"
@@ -281,7 +281,7 @@ function RunRow({ run, hasLocal, onOpen }: { run: MarianoRun; hasLocal: boolean;
           {hasLocal && (
             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
               title="Le immagini sono salvate su questo dispositivo — clic per aprirle senza rigenerare"
-              style={{ background: "rgba(167,139,250,0.15)", color: "var(--purple-400)", border: "1px solid rgba(167,139,250,0.3)" }}>
+              style={{ background: "rgba(62,95,232,0.15)", color: "var(--purple-400)", border: "1px solid rgba(62,95,232,0.3)" }}>
               📦 SALVATO
             </span>
           )}
@@ -332,11 +332,11 @@ function LocalRunRow({ run, onOpen }: { run: RunSummary; onOpen: () => void }) {
       onClick={onOpen}
       className="w-full text-left rounded-xl p-4 transition-all hover:scale-[1.005] flex items-center gap-4 group"
       style={{
-        background: "rgba(167,139,250,0.04)",
-        border: "1px solid rgba(167,139,250,0.18)",
+        background: "rgba(62,95,232,0.04)",
+        border: "1px solid rgba(62,95,232,0.18)",
       }}
       onMouseEnter={(e) => { e.currentTarget.style.borderColor = `${accent}55`; }}
-      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(167,139,250,0.18)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "rgba(62,95,232,0.18)"; }}
     >
       <div className="w-12 h-12 rounded-lg shrink-0"
         style={{ background: accent, boxShadow: `0 0 18px ${accent}55` }} />
@@ -346,7 +346,7 @@ function LocalRunRow({ run, onOpen }: { run: RunSummary; onOpen: () => void }) {
             {run.asin}
           </span>
           <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-full"
-            style={{ background: "rgba(167,139,250,0.15)", color: "var(--purple-400)", border: "1px solid rgba(167,139,250,0.3)" }}>
+            style={{ background: "rgba(62,95,232,0.15)", color: "var(--purple-400)", border: "1px solid rgba(62,95,232,0.3)" }}>
             📦 LOCALE
           </span>
           {run.meta.categoria && (

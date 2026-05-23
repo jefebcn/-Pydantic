@@ -25,7 +25,7 @@ export default function SlideCard({ url, slideNum, qcScore }: SlideCardProps) {
         {/* Slide number badge */}
         <div
           className="absolute top-2 left-2 text-xs font-bold px-2 py-1 rounded-md"
-          style={{ background: "rgba(11,11,24,0.8)", color: "var(--purple-400)" }}
+          style={{ background: "rgba(255,255,255,0.8)", color: "var(--purple-400)" }}
         >
           {String(slideNum).padStart(2, "0")}
         </div>
@@ -61,15 +61,15 @@ export default function SlideCard({ url, slideNum, qcScore }: SlideCardProps) {
           download
           className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all"
           style={{
-            background: "rgba(139,92,246,0.1)",
+            background: "rgba(30,63,217,0.1)",
             color: "var(--purple-400)",
-            border: "1px solid rgba(139,92,246,0.2)",
+            border: "1px solid rgba(30,63,217,0.2)",
           }}
           onMouseEnter={e => {
-            (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.2)";
+            (e.currentTarget as HTMLElement).style.background = "rgba(30,63,217,0.2)";
           }}
           onMouseLeave={e => {
-            (e.currentTarget as HTMLElement).style.background = "rgba(139,92,246,0.1)";
+            (e.currentTarget as HTMLElement).style.background = "rgba(30,63,217,0.1)";
           }}
         >
           <IconDownload size={12} />

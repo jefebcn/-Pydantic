@@ -288,20 +288,35 @@ function HomePageInner() {
     <main id="generate" className="px-5 md:px-8 pt-6 md:pt-10 pb-16 max-w-5xl mx-auto">
 
         {/* Hero */}
-        <header className="mb-8 md:mb-14">
-          <p className="text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase mb-2 sm:mb-3"
-            style={{ color: "var(--purple-400)" }}>
-            Amazon · Infografiche AI
-          </p>
-          <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold leading-tight tracking-tight"
-            style={{ color: "var(--text-primary)" }}>
-            Da ASIN a <span className="gradient-text">10 immagini pronte</span>
-            <br className="hidden md:block" /> per il listing.
-          </h1>
-          <p className="mt-3 sm:mt-4 text-xs sm:text-sm md:text-base max-w-2xl" style={{ color: "var(--text-muted)" }}>
-            Analisi vision del prodotto, generazione dei 10 prompt in stile Mariano,
-            poi rendering parallelo con Nano Banana Pro + Flash. Tutto in un flusso a 3 passi.
-          </p>
+        <header className="mb-8 md:mb-14 flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
+          {/* Logo block */}
+          <div className="shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-wordmark.svg" alt="PYDANTIC"
+              className="hidden sm:block h-16 md:h-20 w-auto"
+              style={{ filter: "drop-shadow(0 4px 24px rgba(30,63,217,0.10))" }} />
+            {/* On mobile show only the icon (the wordmark is in the top bar) */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-icon.svg" alt=""
+              className="sm:hidden w-20 h-20 rounded-2xl"
+              style={{ border: "1px solid var(--border)", boxShadow: "0 4px 24px rgba(30,63,217,0.10)" }} />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase mb-2 sm:mb-3"
+              style={{ color: "var(--brand)" }}>
+              Amazon · Infografiche AI
+            </p>
+            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold leading-tight tracking-tight"
+              style={{ color: "var(--text-primary)" }}>
+              Da ASIN a <span className="gradient-text">10 immagini pronte</span>
+              <br className="hidden md:block" /> per il listing.
+            </h1>
+            <p className="mt-3 sm:mt-4 text-xs sm:text-sm md:text-base max-w-2xl" style={{ color: "var(--text-muted)" }}>
+              Analisi vision del prodotto, generazione dei 10 prompt in stile Mariano,
+              poi rendering parallelo con Nano Banana Pro + Flash. Tutto in un flusso a 3 passi.
+            </p>
+          </div>
         </header>
 
         {/* Stepper */}
@@ -338,15 +353,15 @@ function HomePageInner() {
                 autoCapitalize="characters"
                 className="w-full px-5 py-4 rounded-xl font-mono text-lg tracking-[0.18em] outline-none transition-all"
                 style={{
-                  background: "rgba(11,11,24,0.7)",
+                  background: "rgba(255,255,255,0.7)",
                   border: marianoError
                     ? "1px solid rgba(239,68,68,0.55)"
                     : asin.length === 10
-                      ? "1px solid rgba(139,92,246,0.55)"
-                      : "1px solid rgba(139,92,246,0.22)",
+                      ? "1px solid rgba(30,63,217,0.55)"
+                      : "1px solid rgba(30,63,217,0.22)",
                   color: "var(--text-primary)",
                   boxShadow: asin.length === 10 && !marianoError
-                    ? "0 0 0 4px rgba(139,92,246,0.12)"
+                    ? "0 0 0 4px rgba(30,63,217,0.12)"
                     : "none",
                 }}
               />
@@ -380,8 +395,8 @@ function HomePageInner() {
                   onClick={() => { setAsin(r); setMarianoError(null); }}
                   className="text-[11px] font-mono px-2.5 py-1 rounded-md transition-all hover:scale-[1.03]"
                   style={{
-                    background: asin === r ? "rgba(139,92,246,0.18)" : "rgba(255,255,255,0.04)",
-                    border: asin === r ? "1px solid rgba(139,92,246,0.4)" : "1px solid rgba(255,255,255,0.08)",
+                    background: asin === r ? "rgba(30,63,217,0.18)" : "rgba(30,63,217,0.04)",
+                    border: asin === r ? "1px solid rgba(30,63,217,0.4)" : "1px solid rgba(30,63,217,0.08)",
                     color: asin === r ? "var(--purple-400)" : "var(--text-muted)",
                   }}>
                   {r}
@@ -410,7 +425,7 @@ function HomePageInner() {
           )}
 
           <div className="mt-5 pt-4 flex flex-wrap gap-x-5 gap-y-2"
-            style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+            style={{ borderTop: "1px solid rgba(30,63,217,0.06)" }}>
             {["Scraping Amazon", "Vision Claude", "10 prompt", "Pronti per render"].map((s, i) => {
               const reached = marianoLoading || marianoResult;
               return (
@@ -418,7 +433,7 @@ function HomePageInner() {
                   style={{ color: reached ? "var(--text-primary)" : "var(--text-muted)" }}>
                   <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 transition-all"
                     style={{
-                      background: reached ? "rgba(139,92,246,0.25)" : "rgba(255,255,255,0.04)",
+                      background: reached ? "rgba(30,63,217,0.25)" : "rgba(30,63,217,0.04)",
                       color: reached ? "var(--purple-400)" : "var(--text-muted)",
                     }}>
                     {i + 1}
@@ -485,9 +500,9 @@ function HomePageInner() {
                         <span className="text-[10px] font-mono px-2 py-0.5 rounded-full"
                           title="Costo stimato totale per questa run (Claude + Gemini)"
                           style={{
-                            background: "rgba(139,92,246,0.12)",
+                            background: "rgba(30,63,217,0.12)",
                             color: "var(--purple-400)",
-                            border: "1px solid rgba(139,92,246,0.25)",
+                            border: "1px solid rgba(30,63,217,0.25)",
                           }}>
                           ≈ ${costEstimate.toFixed(2)}
                         </span>
@@ -519,9 +534,9 @@ function HomePageInner() {
                       className="text-xs px-3 py-2 rounded-lg font-semibold transition-all"
                       title="Forza una nuova chiamata Rainforest + Claude (nuovo costo ~$0.028)"
                       style={{
-                        background: "rgba(255,255,255,0.04)",
+                        background: "rgba(30,63,217,0.04)",
                         color: "var(--text-muted)",
-                        border: "1px solid rgba(255,255,255,0.08)",
+                        border: "1px solid rgba(30,63,217,0.08)",
                       }}>
                       <span className="flex items-center gap-1.5"><RefreshIcon />Rigenera</span>
                     </button>
@@ -529,9 +544,9 @@ function HomePageInner() {
                   <button onClick={downloadJson}
                     className="text-xs px-3 py-2 rounded-lg font-semibold transition-all"
                     style={{
-                      background: "rgba(139,92,246,0.15)",
+                      background: "rgba(30,63,217,0.15)",
                       color: "var(--purple-400)",
-                      border: "1px solid rgba(139,92,246,0.3)",
+                      border: "1px solid rgba(30,63,217,0.3)",
                     }}>
                     <span className="flex items-center gap-1.5"><DownloadIcon />.json</span>
                   </button>
@@ -540,7 +555,7 @@ function HomePageInner() {
 
               {/* Description (collapsed by default — short version) */}
               <details className="rounded-lg group"
-                style={{ background: "rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.05)" }}>
+                style={{ background: "rgba(0,0,0,0.18)", border: "1px solid rgba(30,63,217,0.05)" }}>
                 <summary className="px-4 py-3 cursor-pointer text-xs font-semibold tracking-wider uppercase select-none flex items-center justify-between"
                   style={{ color: "var(--text-muted)" }}>
                   <span>Descrizione visiva prodotto</span>
@@ -567,10 +582,10 @@ function HomePageInner() {
                         onClick={() => setExpandedImg(active ? null : img.number)}
                         className="text-left rounded-xl p-3 transition-all"
                         style={{
-                          background: active ? "rgba(139,92,246,0.14)" : "rgba(255,255,255,0.03)",
+                          background: active ? "rgba(30,63,217,0.14)" : "rgba(30,63,217,0.03)",
                           border: active
                             ? `1px solid ${marianoResult.accent_color_hex}77`
-                            : "1px solid rgba(255,255,255,0.07)",
+                            : "1px solid rgba(30,63,217,0.07)",
                         }}>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-xs font-mono font-bold"
@@ -606,7 +621,7 @@ function HomePageInner() {
                       </p>
                       <button onClick={() => setExpandedImg(null)}
                         className="text-xs w-7 h-7 rounded-md flex items-center justify-center transition-all"
-                        style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-muted)" }}>
+                        style={{ background: "rgba(30,63,217,0.06)", color: "var(--text-muted)" }}>
                         ✕
                       </button>
                     </div>
@@ -620,7 +635,7 @@ function HomePageInner() {
 
               {/* CTA — Genera 10 immagini */}
               <div className="flex items-center justify-between flex-wrap gap-3 pt-4"
-                style={{ borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+                style={{ borderTop: "1px solid rgba(30,63,217,0.06)" }}>
                 <div>
                   <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
                     {validImages.length > 0 ? "Le immagini sono qui sotto" : "Pronto al rendering"}
@@ -729,14 +744,14 @@ function HomePageInner() {
           )}
         </Step>
 
-        <footer className="mt-12 pt-6 text-xs text-center" style={{ color: "var(--text-muted)", borderTop: "1px solid rgba(255,255,255,0.05)" }}>
+        <footer className="mt-12 pt-6 text-xs text-center" style={{ color: "var(--text-muted)", borderTop: "1px solid rgba(30,63,217,0.05)" }}>
           Claude Haiku 4.5 · Nano Banana Pro · Flash · GPT Image · Supabase cache
           <span className="block mt-1 opacity-60">
             <kbd className="px-1 py-0.5 rounded text-[9px]"
-              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>ESC</kbd>
+              style={{ background: "rgba(30,63,217,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>ESC</kbd>
             {" "}chiude i pannelli — {" "}
             <kbd className="px-1 py-0.5 rounded text-[9px]"
-              style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>← →</kbd>
+              style={{ background: "rgba(30,63,217,0.06)", border: "1px solid rgba(255,255,255,0.1)" }}>← →</kbd>
             {" "}navigano nelle immagini
           </span>
         </footer>
@@ -849,7 +864,7 @@ function EmptyHint({ text }: { text: string }) {
     <div className="px-4 py-8 rounded-xl text-center"
       style={{
         background: "rgba(255,255,255,0.015)",
-        border: "1px dashed rgba(255,255,255,0.08)",
+        border: "1px dashed rgba(30,63,217,0.08)",
         color: "var(--text-muted)",
       }}>
       <p className="text-xs">{text}</p>
@@ -866,7 +881,7 @@ function SkeletonCard({ delay = 0 }: { delay?: number }) {
       className="rounded-xl p-3 skeleton-pulse"
       style={{
         background: "rgba(255,255,255,0.025)",
-        border: "1px solid rgba(255,255,255,0.05)",
+        border: "1px solid rgba(30,63,217,0.05)",
         animationDelay: `${delay}ms`,
       }}>
       <div className="h-3 w-8 rounded mb-2 skeleton-shimmer" />
@@ -882,8 +897,8 @@ function SkeletonThumb({ delay = 0 }: { delay?: number }) {
       <div
         className="aspect-square rounded-xl skeleton-shimmer skeleton-pulse"
         style={{
-          background: "rgba(255,255,255,0.04)",
-          border: "1px solid rgba(255,255,255,0.06)",
+          background: "rgba(30,63,217,0.04)",
+          border: "1px solid rgba(30,63,217,0.06)",
           animationDelay: `${delay}ms`,
         }}
       />

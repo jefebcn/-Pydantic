@@ -95,11 +95,11 @@ export default function RunPage() {
     return (
       <main className="px-5 md:px-8 pt-6 md:pt-10 pb-16 max-w-5xl mx-auto">
         <div className="h-24 rounded-xl skeleton-shimmer skeleton-pulse mb-4"
-          style={{ background: "rgba(255,255,255,0.03)" }} />
+          style={{ background: "rgba(30,63,217,0.03)" }} />
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
           {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="aspect-square rounded-xl skeleton-shimmer skeleton-pulse"
-              style={{ background: "rgba(255,255,255,0.04)", animationDelay: `${i * 60}ms` }} />
+              style={{ background: "rgba(30,63,217,0.04)", animationDelay: `${i * 60}ms` }} />
           ))}
         </div>
       </main>
@@ -137,9 +137,9 @@ export default function RunPage() {
             <Link href="/history"
               className="text-sm px-4 py-2.5 rounded-lg font-semibold transition-all"
               style={{
-                background: "rgba(255,255,255,0.04)",
+                background: "rgba(30,63,217,0.04)",
                 color: "var(--text-muted)",
-                border: "1px solid rgba(255,255,255,0.08)",
+                border: "1px solid rgba(30,63,217,0.08)",
               }}>
               Torna alla cronologia
             </Link>
@@ -202,9 +202,9 @@ export default function RunPage() {
             <Link href={`/?asin=${run.asin}`}
               className="text-xs px-3 py-2 rounded-lg font-semibold transition-all"
               style={{
-                background: "rgba(139,92,246,0.15)",
+                background: "rgba(30,63,217,0.15)",
                 color: "var(--purple-400)",
-                border: "1px solid rgba(139,92,246,0.3)",
+                border: "1px solid rgba(30,63,217,0.3)",
               }}>
               Rigenera
             </Link>
@@ -229,7 +229,7 @@ export default function RunPage() {
       {/* Description, collapsed */}
       {run.meta.description && (
         <details className="rounded-lg mb-6 group"
-          style={{ background: "rgba(0,0,0,0.18)", border: "1px solid rgba(255,255,255,0.05)" }}>
+          style={{ background: "rgba(0,0,0,0.18)", border: "1px solid rgba(30,63,217,0.05)" }}>
           <summary className="px-4 py-3 cursor-pointer text-xs font-semibold tracking-wider uppercase select-none flex items-center justify-between"
             style={{ color: "var(--text-muted)" }}>
             <span>Descrizione visiva prodotto</span>
@@ -294,9 +294,9 @@ export default function RunPage() {
                 onClick={() => setConfirmDelete(false)}
                 className="text-xs px-3 py-2 rounded-lg font-semibold"
                 style={{
-                  background: "rgba(255,255,255,0.04)",
+                  background: "rgba(30,63,217,0.04)",
                   color: "var(--text-muted)",
-                  border: "1px solid rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(30,63,217,0.08)",
                 }}>
                 Annulla
               </button>
