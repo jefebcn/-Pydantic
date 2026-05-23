@@ -770,13 +770,30 @@ async def generate_mariano_prompts(
 
     images = _build_prompts(a, global_rule, accent, bg)
 
+    # Bullet points reali del listing Amazon (NON inventati): vengono presi
+    # tal quali da Rainforest. Garantiamo SEMPRE almeno 5 elementi: se Amazon
+    # ne fornisce di meno, completiamo con i `benefits_5` di Claude (che sono
+    # comunque estratti dalla descrizione del prodotto, non inventati ex novo).
+    raw_bullets = [b for b in (amazon_data.get("feature_bullets") or []) if isinstance(b, str) and b.strip()]
+    if len(raw_bullets) < 5:
+        ai_bullets = [b for b in (a.get("benefits_5") or []) if isinstance(b, str) and b.strip()]
+        for b in ai_bullets:
+            if b not in raw_bullets:
+                raw_bullets.append(b)
+            if len(raw_bullets) >= 5:
+                break
+    product_bullets = raw_bullets[:8]   # cap at 8 to keep the UI compact
+
     return {
+        "product_title":             amazon_data.get("title", ""),
+        "product_brand":             amazon_data.get("brand", ""),
+        "product_bullets":           product_bullets,
         "product_visual_description": a.get("product_visual_description", ""),
-        "categoria_effetto_01b": a.get("categoria_effetto_01b", "energy burst neutro"),
-        "accent_color_hex": accent,
-        "palette_sfondo_hex": bg,
-        "global_rule": global_rule,
-        "images": images,
+        "categoria_effetto_01b":     a.get("categoria_effetto_01b", "energy burst neutro"),
+        "accent_color_hex":          accent,
+        "palette_sfondo_hex":        bg,
+        "global_rule":               global_rule,
+        "images":                    images,
         "negative_prompt": (
             "No redrawn product. No illustrated or cartoon style product. "
             "No product recreated from scratch. No glow or color effect applied directly ON the product. "

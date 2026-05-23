@@ -104,7 +104,7 @@ function HistoryPageInner() {
       <header className="mb-8">
         <p className="text-xs font-semibold tracking-[0.18em] uppercase mb-3"
           style={{ color: "var(--purple-400)" }}>
-          Cronologia · Mariano runs
+          Cronologia · Infografiche
         </p>
         <h1 className="text-3xl md:text-4xl font-bold tracking-tight"
           style={{ color: "var(--text-primary)" }}>

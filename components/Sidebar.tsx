@@ -142,6 +142,33 @@ export default function Sidebar() {
             </ul>
           </div>
         ))}
+
+        {/* Admin link — only rendered when the logged-in user's email is in
+           NEXT_PUBLIC_ADMIN_EMAILS. The real gate is server-side; this is
+           cosmetic so non-admins don't see a dead link. */}
+        {isAdminUser(user?.email) && (
+          <div>
+            <p className="text-xs font-semibold tracking-widest px-2 mb-2"
+              style={{ color: "var(--text-muted)" }}>
+              ADMIN
+            </p>
+            <ul className="space-y-0.5">
+              <li>
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all"
+                  style={{
+                    background: pathname === "/admin" ? "rgba(30,63,217,0.15)" : "transparent",
+                    color: pathname === "/admin" ? "var(--purple-400)" : "var(--text-muted)",
+                    borderLeft: pathname === "/admin" ? "2px solid var(--purple-500)" : "2px solid transparent",
+                  }}>
+                  <IconShield size={16} />
+                  Dashboard admin
+                </Link>
+              </li>
+            </ul>
+          </div>
+        )}
       </nav>
 
       {/* Auth section — always visible */}
@@ -266,4 +293,21 @@ function IconSparkles({ size = 16 }: { size?: number }) {
       <path d="M5 3l.5 1.5L7 5l-1.5.5L5 7l-.5-1.5L3 5l1.5-.5z" />
     </svg>
   );
+}
+
+function IconShield({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
+/** Client-side admin check (cosmetic — the real gate is server-side). */
+function isAdminUser(email: string | null | undefined): boolean {
+  if (!email) return false;
+  const raw = process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? "";
+  return raw.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
+    .includes(email.toLowerCase());
 }

@@ -33,6 +33,9 @@ export interface RunMeta {
   palette: string[];
   categoria: string;
   description?: string;
+  bullets?: string[];          // bullet points reali dal listing Amazon
+  title?: string;
+  brand?: string;
 }
 
 export interface StoredRun {

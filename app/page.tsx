@@ -12,6 +12,9 @@ import { LOGO_ICON_SRC } from "@/lib/brand";
  * ────────────────────────────────────────────────────────────────────────── */
 interface MarianoResult {
   product_visual_description: string;
+  product_title?: string;
+  product_brand?: string;
+  product_bullets?: string[];
   categoria_effetto_01b: string;
   accent_color_hex: string;
   palette_sfondo_hex: string[];
@@ -208,6 +211,9 @@ function HomePageInner() {
         palette:     marianoResult.palette_sfondo_hex,
         categoria:   marianoResult.categoria_effetto_01b,
         description: marianoResult.product_visual_description,
+        bullets:     marianoResult.product_bullets,
+        title:       marianoResult.product_title,
+        brand:       marianoResult.product_brand,
       }).catch((e) => console.warn("[imageStore] saveRun failed:", e));
     } catch (err) {
       setImgGenError(err instanceof Error ? err.message : "Errore di rete");
@@ -305,7 +311,7 @@ function HomePageInner() {
             <br className="hidden md:block" /> per il listing.
           </h1>
           <p className="mt-3 sm:mt-4 text-xs sm:text-sm md:text-base max-w-2xl" style={{ color: "var(--text-muted)" }}>
-            Analisi vision del prodotto, generazione dei 10 prompt in stile Mariano,
+            Analisi vision del prodotto, generazione dei 10 prompt in stile infografico,
             poi rendering parallelo con Nano Banana Pro + Flash. Tutto in un flusso a 3 passi.
           </p>
         </header>
@@ -543,6 +549,32 @@ function HomePageInner() {
                   </button>
                 </div>
               </div>
+
+              {/* Bullet points reali dal listing Amazon (almeno 5 garantiti) */}
+              {marianoResult.product_bullets && marianoResult.product_bullets.length > 0 && (
+                <div className="rounded-lg p-4"
+                  style={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)" }}>
+                  <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+                    <p className="text-xs font-semibold tracking-wider uppercase"
+                      style={{ color: "var(--brand)" }}>
+                      Bullet points prodotto
+                    </p>
+                    <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                      {marianoResult.product_bullets.length} dal listing Amazon — niente invenzioni
+                    </p>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {marianoResult.product_bullets.map((b, i) => (
+                      <li key={i} className="text-xs leading-relaxed pl-4 relative"
+                        style={{ color: "var(--text-primary)" }}>
+                        <span className="absolute left-0 top-[2px] font-mono font-bold"
+                          style={{ color: "var(--brand)" }}>›</span>
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Description (collapsed by default — short version) */}
               <details className="rounded-lg group"

@@ -226,6 +226,32 @@ export default function RunPage() {
         )}
       </header>
 
+      {/* Bullet points reali dal listing Amazon */}
+      {run.meta.bullets && run.meta.bullets.length > 0 && (
+        <div className="rounded-lg p-4 mb-6"
+          style={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)" }}>
+          <div className="flex items-baseline justify-between mb-3 flex-wrap gap-2">
+            <p className="text-xs font-semibold tracking-wider uppercase"
+              style={{ color: "var(--brand)" }}>
+              Bullet points prodotto
+            </p>
+            <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+              {run.meta.bullets.length} dal listing Amazon
+            </p>
+          </div>
+          <ul className="space-y-1.5">
+            {run.meta.bullets.map((b, i) => (
+              <li key={i} className="text-xs leading-relaxed pl-4 relative"
+                style={{ color: "var(--text-primary)" }}>
+                <span className="absolute left-0 top-[2px] font-mono font-bold"
+                  style={{ color: "var(--brand)" }}>›</span>
+                {b}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {/* Description, collapsed */}
       {run.meta.description && (
         <details className="rounded-lg mb-6 group"
