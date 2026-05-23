@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import AuthModal from "@/components/AuthModal";
+import { LOGO_ICON_SRC } from "@/lib/brand";
 
 const navItems = [
   {
@@ -91,7 +92,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="flex items-center gap-3 px-5 py-5 border-b" style={{ borderColor: "var(--border)" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-icon.svg" alt="" width={40} height={40}
+        <img src={LOGO_ICON_SRC} alt="" width={40} height={40}
           className="w-10 h-10 rounded-lg shrink-0"
           style={{
             border: "1px solid var(--border)",

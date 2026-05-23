@@ -5,6 +5,7 @@ import JSZip from "jszip";
 import ImageThumb from "@/components/ImageThumb";
 import Lightbox from "@/components/Lightbox";
 import { saveRun } from "@/lib/imageStore";
+import { LOGO_ICON_SRC } from "@/lib/brand";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -287,36 +288,26 @@ function HomePageInner() {
   return (
     <main id="generate" className="px-5 md:px-8 pt-6 md:pt-10 pb-16 max-w-5xl mx-auto">
 
-        {/* Hero */}
-        <header className="mb-8 md:mb-14 flex flex-col sm:flex-row gap-6 sm:gap-8 items-start">
-          {/* Logo block */}
-          <div className="shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-wordmark.svg" alt="PYDANTIC"
-              className="hidden sm:block h-16 md:h-20 w-auto"
-              style={{ filter: "drop-shadow(0 4px 24px rgba(30,63,217,0.10))" }} />
-            {/* On mobile show only the icon (the wordmark is in the top bar) */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-icon.svg" alt=""
-              className="sm:hidden w-20 h-20 rounded-2xl"
-              style={{ border: "1px solid var(--border)", boxShadow: "0 4px 24px rgba(30,63,217,0.10)" }} />
-          </div>
+        {/* Hero — logo inline above the title, never competing for width */}
+        <header className="mb-8 md:mb-14">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={LOGO_ICON_SRC} alt=""
+            className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl mb-4 sm:mb-5"
+            style={{ border: "1px solid var(--border)", boxShadow: "0 4px 24px rgba(30,63,217,0.10)" }} />
 
-          <div className="flex-1 min-w-0">
-            <p className="text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase mb-2 sm:mb-3"
-              style={{ color: "var(--brand)" }}>
-              Amazon · Infografiche AI
-            </p>
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold leading-tight tracking-tight"
-              style={{ color: "var(--text-primary)" }}>
-              Da ASIN a <span className="gradient-text">10 immagini pronte</span>
-              <br className="hidden md:block" /> per il listing.
-            </h1>
-            <p className="mt-3 sm:mt-4 text-xs sm:text-sm md:text-base max-w-2xl" style={{ color: "var(--text-muted)" }}>
-              Analisi vision del prodotto, generazione dei 10 prompt in stile Mariano,
-              poi rendering parallelo con Nano Banana Pro + Flash. Tutto in un flusso a 3 passi.
-            </p>
-          </div>
+          <p className="text-[10px] sm:text-xs font-semibold tracking-[0.18em] uppercase mb-2 sm:mb-3"
+            style={{ color: "var(--brand)" }}>
+            Amazon · Infografiche AI
+          </p>
+          <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold leading-tight tracking-tight"
+            style={{ color: "var(--text-primary)" }}>
+            Da ASIN a <span className="gradient-text">10 immagini pronte</span>
+            <br className="hidden md:block" /> per il listing.
+          </h1>
+          <p className="mt-3 sm:mt-4 text-xs sm:text-sm md:text-base max-w-2xl" style={{ color: "var(--text-muted)" }}>
+            Analisi vision del prodotto, generazione dei 10 prompt in stile Mariano,
+            poi rendering parallelo con Nano Banana Pro + Flash. Tutto in un flusso a 3 passi.
+          </p>
         </header>
 
         {/* Stepper */}

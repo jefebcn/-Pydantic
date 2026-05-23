@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
+import { LOGO_ICON_SRC } from "@/lib/brand";
 
 /** Mariano run as returned by GET /api/mariano-runs */
 interface MarianoRun {
@@ -134,7 +135,7 @@ export default function TopBar() {
       {/* Brand — PYDANTIC logo + wordmark */}
       <Link href="/" className="shrink-0 flex items-center gap-2.5 group">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-icon.svg" alt="" width={36} height={36}
+        <img src={LOGO_ICON_SRC} alt="" width={36} height={36}
           className="w-9 h-9 rounded-lg shrink-0"
           style={{
             border: "1px solid var(--border)",

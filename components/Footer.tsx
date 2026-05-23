@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useCallback } from "react";
+import { LOGO_ICON_SRC } from "@/lib/brand";
 
 const LEGAL_LINKS = [
   { href: "/privacy",  label: "Privacy Policy" },
@@ -32,7 +33,7 @@ export default function Footer() {
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-icon.svg" alt="" width={36} height={36}
+            <img src={LOGO_ICON_SRC} alt="" width={36} height={36}
               className="w-9 h-9 rounded-md shrink-0"
               style={{ border: "1px solid var(--border)" }} />
             <div className="leading-tight">
