@@ -291,7 +291,7 @@ function HomePageInner() {
         {/* Hero — logo inline above the title, never competing for width */}
         <header className="mb-8 md:mb-14">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={LOGO_ICON_SRC} alt=""
+          <img src={LOGO_ICON_SRC} alt="PYDANTIC"
             className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl mb-4 sm:mb-5"
             style={{ border: "1px solid var(--border)", boxShadow: "0 4px 24px rgba(30,63,217,0.10)" }} />
 

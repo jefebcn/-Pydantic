@@ -19,11 +19,11 @@
  * still wins (Next.js convention). Replace that file too if you want the
  * raster icon there as well.
  */
-export const LOGO_ICON_SRC = "/logo-icon.svg";
+export const LOGO_ICON_SRC = "/logo.png";
 
 /** Long-form mark, currently unused in the hero — kept for future
  *  "About / press" pages where a wide wordmark makes sense. */
-export const LOGO_WORDMARK_SRC = "/logo-wordmark.svg";
+export const LOGO_WORDMARK_SRC = "/logo.png";
 
 export const BRAND = {
   name: "PYDANTIC",

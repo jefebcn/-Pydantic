@@ -45,11 +45,14 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   icons: {
     icon: [
-      { url: "/favicon.svg",    type: "image/svg+xml" },
-      { url: "/logo-icon.svg",  type: "image/svg+xml", sizes: "512x512" },
+      { url: "/favicon-32.png", type: "image/png", sizes: "32x32"   },
+      { url: "/logo-192.png",   type: "image/png", sizes: "192x192" },
+      { url: "/logo.png",       type: "image/png", sizes: "512x512" },
     ],
-    apple: "/logo-icon.svg",
-    shortcut: "/favicon.svg",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180" },
+    ],
+    shortcut: "/favicon-32.png",
   },
   other: {
     "mobile-web-app-capable": "yes",
