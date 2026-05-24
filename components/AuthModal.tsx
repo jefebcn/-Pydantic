@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "@/lib/auth-context";
 import { LOGO_ICON_SRC } from "@/lib/brand";
 
@@ -19,6 +20,10 @@ export default function AuthModal({ open, onClose, defaultTab = "login" }: Props
   const [success, setSuccess]   = useState<string | null>(null);
   const { signIn, signUp }      = useAuth();
   const backdropRef             = useRef<HTMLDivElement>(null);
+  const [mounted, setMounted]   = useState(false);
+
+  /* Portal target only exists client-side */
+  useEffect(() => { setMounted(true); }, []);
 
   /* Reset on tab change */
   useEffect(() => { setError(null); setSuccess(null); }, [tab]);
@@ -31,7 +36,7 @@ export default function AuthModal({ open, onClose, defaultTab = "login" }: Props
     return () => window.removeEventListener("keydown", fn);
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,12 +62,14 @@ export default function AuthModal({ open, onClose, defaultTab = "login" }: Props
     }
   };
 
-  return (
-    /* Backdrop */
+  return createPortal(
+    /* Backdrop — portalled to <body> so the Sidebar's transform (which
+       creates a containing block) can't anchor this fixed overlay to the
+       220px sidebar column. */
     <div
       ref={backdropRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.7)", backdropFilter: "blur(6px)" }}
+      className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      style={{ background: "rgba(15,23,54,0.55)", backdropFilter: "blur(6px)" }}
       onClick={(e) => { if (e.target === backdropRef.current) onClose(); }}
     >
       <div
@@ -170,7 +177,8 @@ export default function AuthModal({ open, onClose, defaultTab = "login" }: Props
           </p>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

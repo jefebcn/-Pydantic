@@ -302,7 +302,18 @@ export default function TopBar() {
           )}
         </div>
 
-        {/* Avatar pill + user dropdown */}
+        {/* Logged out → prominent "Accedi" CTA. Logged in → avatar pill + dropdown */}
+        {!user ? (
+          <button
+            onClick={() => document.dispatchEvent(new CustomEvent("open-auth-modal", { detail: "login" }))}
+            className="btn-primary flex items-center gap-2 whitespace-nowrap"
+            style={{ padding: "0.5rem 1rem", fontSize: "0.875rem" }}
+            title="Accedi al tuo account"
+          >
+            <UserIcon />
+            <span>Accedi</span>
+          </button>
+        ) : (
         <div className="relative">
           <button
             onClick={() => setOpenPanel(openPanel === "user" ? null : "user")}
@@ -311,16 +322,16 @@ export default function TopBar() {
               background: openPanel === "user" ? "rgba(30,63,217,0.25)" : "rgba(30,63,217,0.15)",
               border: openPanel === "user" ? "1px solid rgba(30,63,217,0.4)" : "1px solid rgba(30,63,217,0.25)",
             }}
-            title={user ? "Account utente" : "Accedi"}
+            title="Account utente"
           >
             <div
               className="w-6 h-6 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-              style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}
+              style={{ background: "linear-gradient(135deg, var(--brand-deep), var(--brand-soft))" }}
             >
               {initials}
             </div>
             <span className="text-xs font-semibold hidden sm:block" style={{ color: "var(--purple-400)" }}>
-              {user ? (user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "Account") : "Guest"}
+              {user.user_metadata?.display_name ?? user.email?.split("@")[0] ?? "Account"}
             </span>
           </button>
 
@@ -403,6 +414,7 @@ export default function TopBar() {
             </Dropdown>
           )}
         </div>
+        )}
       </div>
     </header>
   );
@@ -499,6 +511,14 @@ function HamburgerIcon() {
       <line x1="3" y1="6"  x2="21" y2="6"  />
       <line x1="3" y1="12" x2="21" y2="12" />
       <line x1="3" y1="18" x2="21" y2="18" />
+    </svg>
+  );
+}
+function UserIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+      <circle cx="12" cy="7" r="4" />
     </svg>
   );
 }
