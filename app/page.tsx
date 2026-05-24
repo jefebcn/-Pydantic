@@ -97,8 +97,29 @@ function HomePageInner() {
   /* Refs for smooth auto-scroll */
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
+  const asinInputRef = useRef<HTMLInputElement | null>(null);
 
   const validImages = generatedImages.filter(i => i.image_b64);
+
+  /* "Nuovo Job" (sidebar) → ?new=1 : reset everything + focus the ASIN input. */
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    setAsin("");
+    setMarianoResult(null);
+    setMarianoError(null);
+    setGeneratedImages([]);
+    setImgGenError(null);
+    setExpandedImg(null);
+    setLightboxIdx(null);
+    // strip the param so it doesn't re-trigger on refresh/back
+    if (typeof window !== "undefined") {
+      window.history.replaceState(null, "", "/");
+    }
+    requestAnimationFrame(() => {
+      asinInputRef.current?.focus();
+      asinInputRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  }, [searchParams]);
 
   /* ── Load recents from localStorage ───────────────────────────────────── */
   useEffect(() => {
@@ -335,6 +356,7 @@ function HomePageInner() {
           >
             <div className="flex-1 relative">
               <input
+                ref={asinInputRef}
                 type="text"
                 value={asin}
                 onChange={(e) => { setAsin(extractAsin(e.target.value)); setMarianoError(null); }}

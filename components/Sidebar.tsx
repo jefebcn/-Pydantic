@@ -18,7 +18,7 @@ const navItems = [
   {
     section: "TOOLS",
     links: [
-      { href: "/#generate", label: "Nuovo Job", icon: IconSparkles },
+      { href: "/?new=1", label: "Nuovo Job", icon: IconSparkles },
     ],
   },
 ];
