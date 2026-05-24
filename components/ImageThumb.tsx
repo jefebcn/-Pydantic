@@ -1,4 +1,6 @@
 "use client";
+import SlideCanvas from "@/components/SlideCanvas";
+import type { Overlay, OverlayEdits } from "@/lib/slideLayouts";
 
 export interface ThumbImage {
   number: string;
@@ -7,6 +9,8 @@ export interface ThumbImage {
   mime: string | null;
   model: string | null;
   error: string | null;
+  overlay?: Overlay | null;
+  overlayEdits?: OverlayEdits;
 }
 
 /**
@@ -32,12 +36,18 @@ export default function ImageThumb({
             className="w-full h-full group relative"
             title={`Ingrandisci ${img.name}`}
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`data:${img.mime ?? "image/png"};base64,${img.image_b64}`}
-              alt={img.name}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
-            />
+            {img.overlay ? (
+              <div className="w-full h-full transition-transform duration-300 group-hover:scale-[1.04]">
+                <SlideCanvas imageB64={img.image_b64} mime={img.mime} overlay={img.overlay} accent={accent} edits={img.overlayEdits} />
+              </div>
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={`data:${img.mime ?? "image/png"};base64,${img.image_b64}`}
+                alt={img.name}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.04]"
+              />
+            )}
             <div className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
               style={{ background: "rgba(0,0,0,0.55)" }}>
               <div className="px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-xs font-semibold"

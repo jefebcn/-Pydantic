@@ -6,6 +6,7 @@ import JSZip from "jszip";
 import ImageThumb, { type ThumbImage } from "@/components/ImageThumb";
 import Lightbox from "@/components/Lightbox";
 import { getRun, deleteRun, type StoredRun } from "@/lib/imageStore";
+import { compositeSlideToBlob } from "@/lib/renderSlide";
 
 export default function RunPage() {
   const router = useRouter();
@@ -44,13 +45,20 @@ export default function RunPage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [lightboxIdx, validImages.length]);
 
-  const downloadOne = useCallback((img: ThumbImage) => {
+  const accent = run?.meta.accent || "#1E3FD9";
+
+  const downloadOne = useCallback(async (img: ThumbImage) => {
     if (!img.image_b64) return;
+    const png = await compositeSlideToBlob({
+      imageB64: img.image_b64, mime: img.mime, overlay: img.overlay, accent, edits: img.overlayEdits,
+    });
+    const url = URL.createObjectURL(png);
     const a = document.createElement("a");
-    a.href = `data:${img.mime ?? "image/png"};base64,${img.image_b64}`;
+    a.href = url;
     a.download = `${asin}_${img.number}_${img.name.replace(/\s+/g, "_")}.png`;
     a.click();
-  }, [asin]);
+    URL.revokeObjectURL(url);
+  }, [asin, accent]);
 
   const downloadZip = useCallback(async () => {
     if (!validImages.length) return;
@@ -61,15 +69,17 @@ export default function RunPage() {
       const used = new Set<string>();
       for (const img of validImages) {
         if (!img.image_b64) continue;
-        const ext  = (img.mime ?? "image/png").split("/")[1]?.split(";")[0] || "png";
         const safe = `${asin}_${img.number}_${img.name}`
           .replace(/[^a-zA-Z0-9._-]+/g, "_")
           .slice(0, 120);
-        let name = `${safe}.${ext}`;
+        let name = `${safe}.png`;
         let i = 2;
-        while (used.has(name)) { name = `${safe}_${i}.${ext}`; i += 1; }
+        while (used.has(name)) { name = `${safe}_${i}.png`; i += 1; }
         used.add(name);
-        zip.file(name, img.image_b64, { base64: true });
+        const png = await compositeSlideToBlob({
+          imageB64: img.image_b64, mime: img.mime, overlay: img.overlay, accent, edits: img.overlayEdits,
+        });
+        zip.file(name, png);
       }
       const blob = await zip.generateAsync(
         { type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }
@@ -83,7 +93,7 @@ export default function RunPage() {
     } finally {
       setZipBusy(false);
     }
-  }, [validImages, asin]);
+  }, [validImages, asin, accent]);
 
   const handleDelete = async () => {
     await deleteRun(asin);
@@ -148,8 +158,6 @@ export default function RunPage() {
       </main>
     );
   }
-
-  const accent = run.meta.accent || "#A78BFA";
 
   return (
     <main className="px-5 md:px-8 pt-6 md:pt-10 pb-16 max-w-5xl mx-auto">

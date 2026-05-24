@@ -1,5 +1,6 @@
 "use client";
 import type { ThumbImage } from "@/components/ImageThumb";
+import SlideCanvas from "@/components/SlideCanvas";
 
 export default function Lightbox({
   img, index, total, accent, onClose, onPrev, onNext, onDownload,
@@ -99,14 +100,18 @@ export default function Lightbox({
 
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative max-w-[min(90vw,900px)] max-h-[85vh] rounded-2xl overflow-hidden"
+        className="relative w-[min(90vw,85vh)] max-w-[900px] rounded-2xl overflow-hidden"
         style={{ border: `1px solid ${accent}33`, boxShadow: `0 20px 80px ${accent}22` }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={`data:${img.mime ?? "image/png"};base64,${img.image_b64}`}
-          alt={img.name}
-          className="block w-full h-auto max-h-[85vh] object-contain"
-        />
+        {img.overlay ? (
+          <SlideCanvas imageB64={img.image_b64} mime={img.mime} overlay={img.overlay} accent={accent} edits={img.overlayEdits} />
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
+            src={`data:${img.mime ?? "image/png"};base64,${img.image_b64}`}
+            alt={img.name}
+            className="block w-full h-auto max-h-[85vh] object-contain"
+          />
+        )}
       </div>
 
       {img.model && (

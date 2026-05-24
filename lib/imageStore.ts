@@ -19,6 +19,8 @@ const DB_NAME = "pydantic_v1";
 const DB_VERSION = 1;
 const STORE = "runs";
 
+import type { Overlay, OverlayEdits } from "@/lib/slideLayouts";
+
 export interface StoredImage {
   number: string;
   name: string;
@@ -26,6 +28,8 @@ export interface StoredImage {
   mime: string | null;
   model: string | null;
   error: string | null;
+  overlay?: Overlay | null;       // typed text layer for this slide (if any)
+  overlayEdits?: OverlayEdits;    // per-slide editor overrides (scale/theme)
 }
 
 export interface RunMeta {
@@ -36,6 +40,7 @@ export interface RunMeta {
   bullets?: string[];          // bullet points reali dal listing Amazon
   title?: string;
   brand?: string;
+  style?: string;              // visual preset used (minimal/bold/lifestyle/tech)
 }
 
 export interface StoredRun {

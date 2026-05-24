@@ -8,6 +8,8 @@ import FunLoader from "@/components/FunLoader";
 import { saveRun } from "@/lib/imageStore";
 import { LOGO_ICON_SRC } from "@/lib/brand";
 import { useAuth } from "@/lib/auth-context";
+import type { Overlay, OverlayEdits } from "@/lib/slideLayouts";
+import { compositeSlideToBlob } from "@/lib/renderSlide";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -20,7 +22,7 @@ interface MarianoResult {
   categoria_effetto_01b: string;
   accent_color_hex: string;
   palette_sfondo_hex: string[];
-  images: Array<{ number: string; name: string; prompt: string; logo_variant: string | null }>;
+  images: Array<{ number: string; name: string; prompt: string; logo_variant: string | null; overlay?: Overlay | null }>;
   negative_prompt: string;
   _cache_hit?: boolean;
 }
@@ -32,6 +34,8 @@ interface GeneratedImage {
   mime: string | null;
   model: string | null;
   error: string | null;
+  overlay?: Overlay | null;
+  overlayEdits?: OverlayEdits;
 }
 
 type StepStatus = "locked" | "active" | "done";
@@ -225,7 +229,16 @@ function HomePageInner() {
       });
       const data = await res.json();
       if (!res.ok) { setImgGenError(data.error || `HTTP ${res.status}`); return; }
-      const imgs = data.images ?? [];
+      /* Merge the typed text overlay (from the prompts_json) into each
+         generated image by slide number, so the frontend can render the
+         editable text layer on top of the clean background plate. */
+      const overlayByNum = new Map<string, Overlay | null | undefined>(
+        marianoResult.images.map((im) => [im.number, im.overlay]),
+      );
+      const imgs: GeneratedImage[] = (data.images ?? []).map((im: GeneratedImage) => ({
+        ...im,
+        overlay: overlayByNum.get(im.number) ?? null,
+      }));
       setGeneratedImages(imgs);
 
       /* Persist the run to IndexedDB so /run/[asin] and the history page
@@ -261,15 +274,19 @@ function HomePageInner() {
       const used = new Set<string>();
       for (const img of validImages) {
         if (!img.image_b64) continue;
-        const ext  = (img.mime ?? "image/png").split("/")[1]?.split(";")[0] || "png";
         const safe = `${asin}_${img.number}_${img.name}`
           .replace(/[^a-zA-Z0-9._-]+/g, "_")
           .slice(0, 120);
-        let name = `${safe}.${ext}`;
+        let name = `${safe}.png`;
         let i = 2;
-        while (used.has(name)) { name = `${safe}_${i}.${ext}`; i += 1; }
+        while (used.has(name)) { name = `${safe}_${i}.png`; i += 1; }
         used.add(name);
-        zip.file(name, img.image_b64, { base64: true });
+        // Flatten image + overlay (or decode base64 if no overlay)
+        const png = await compositeSlideToBlob({
+          imageB64: img.image_b64, mime: img.mime, overlay: img.overlay,
+          accent: marianoResult?.accent_color_hex ?? "#1E3FD9", edits: img.overlayEdits,
+        });
+        zip.file(name, png);
       }
       const blob = await zip.generateAsync(
         { type: "blob", compression: "DEFLATE", compressionOptions: { level: 6 } }
@@ -296,12 +313,18 @@ function HomePageInner() {
     URL.revokeObjectURL(url);
   };
 
-  const downloadOne = (img: GeneratedImage) => {
+  const downloadOne = async (img: GeneratedImage) => {
     if (!img.image_b64) return;
+    const png = await compositeSlideToBlob({
+      imageB64: img.image_b64, mime: img.mime, overlay: img.overlay,
+      accent: marianoResult?.accent_color_hex ?? "#1E3FD9", edits: img.overlayEdits,
+    });
+    const url = URL.createObjectURL(png);
     const a = document.createElement("a");
-    a.href = `data:${img.mime ?? "image/png"};base64,${img.image_b64}`;
+    a.href = url;
     a.download = `${asin}_${img.number}_${img.name.replace(/\s+/g, "_")}.png`;
     a.click();
+    URL.revokeObjectURL(url);
   };
 
   /* ── Cost estimate (display only) ─────────────────────────────────────── */
