@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { useAuth } from "@/lib/auth-context";
+import { useAuth, SUPABASE_CONFIGURED } from "@/lib/auth-context";
 import { LOGO_ICON_SRC } from "@/lib/brand";
 
 interface Props {
@@ -125,6 +125,15 @@ export default function AuthModal({ open, onClose, defaultTab = "login" }: Props
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
+
+          {!SUPABASE_CONFIGURED && (
+            <div className="rounded-xl p-3 text-xs leading-relaxed"
+              style={{ background: "rgba(252,211,77,0.12)", border: "1px solid rgba(252,211,77,0.4)", color: "#92710A" }}>
+              <strong>⚠ Autenticazione non ancora configurata.</strong><br />
+              Imposta <code>NEXT_PUBLIC_SUPABASE_URL</code> e <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>{" "}
+              su Vercel → Settings → Environment Variables, poi ridistribuisci.
+            </div>
+          )}
 
           {success && (
             <div className="rounded-xl p-3 text-sm"
