@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import JSZip from "jszip";
 import ImageThumb from "@/components/ImageThumb";
 import Lightbox from "@/components/Lightbox";
+import FunLoader from "@/components/FunLoader";
 import { saveRun } from "@/lib/imageStore";
 import { LOGO_ICON_SRC } from "@/lib/brand";
 import { useAuth } from "@/lib/auth-context";
@@ -458,9 +459,7 @@ function HomePageInner() {
 
           {!marianoResult && marianoLoading && (
             <div className="fade-up">
-              <div className="flex items-center gap-3 mb-4 text-sm" style={{ color: "var(--text-muted)" }}>
-                <SpinnerIcon /> Claude sta analizzando il prodotto…
-              </div>
+              <FunLoader phase="analysis" />
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
                 {Array.from({ length: 10 }).map((_, i) => (
                   <SkeletonCard key={i} delay={i * 70} />
@@ -707,9 +706,7 @@ function HomePageInner() {
 
           {validImages.length === 0 && imgGenLoading && (
             <div className="fade-up">
-              <div className="flex items-center gap-3 mb-4 text-sm" style={{ color: "var(--text-muted)" }}>
-                <SpinnerIcon /> Rendering in corso · Nano Banana sta generando 10 immagini in parallelo…
-              </div>
+              <FunLoader phase="render" />
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
                 {Array.from({ length: 10 }).map((_, i) => (
                   <SkeletonThumb key={i} delay={i * 80} />
