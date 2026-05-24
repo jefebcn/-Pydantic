@@ -103,6 +103,7 @@ def log_mariano_run(
     accent_color: str | None = None,
     palette_hex: list[str] | None = None,
     categoria_effetto: str | None = None,
+    user_id: str | None = None,
 ) -> bool:
     """Persist one row in mariano_runs. Returns True on success, False if
     Supabase isn't configured or the insert failed (silent — pipeline never
@@ -116,7 +117,7 @@ def log_mariano_run(
         models   = [i.get("model") for i in ok if i.get("model")]
         cost_usd = _estimate_cost_usd(models, cache_hit)
 
-        client.table(_RUNS_TABLE).insert({
+        row = {
             "asin": asin,
             "cache_hit": bool(cache_hit),
             "num_images_ok": len(ok),
@@ -127,7 +128,11 @@ def log_mariano_run(
             "palette_hex": palette_hex or [],
             "categoria_effetto": categoria_effetto,
             "models_used": models,
-        }).execute()
+        }
+        if user_id:
+            row["user_id"] = user_id
+
+        client.table(_RUNS_TABLE).insert(row).execute()
         return True
     except Exception:
         return False

@@ -345,6 +345,14 @@ export default function TopBar() {
                     </div>
                   </div>
                   <div className="p-2">
+                    <Link href="/account"
+                      onClick={() => setOpenPanel(null)}
+                      className="block px-3 py-2 rounded-lg text-sm transition-all"
+                      style={{ color: "var(--text-primary)" }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(30,63,217,0.05)")}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}>
+                      Il mio account · spesa API
+                    </Link>
                     <Link href="/history"
                       onClick={() => setOpenPanel(null)}
                       className="block px-3 py-2 rounded-lg text-sm transition-all"
@@ -413,9 +421,9 @@ function Dropdown({ children, align = "right", width = 260 }: {
       style={{
         width,
         [align === "right" ? "right" : "left"]: 0,
-        background: "#111124",
+        background: "var(--bg-card)",
         border: "1px solid var(--border)",
-        boxShadow: "0 20px 60px rgba(0,0,0,0.6), 0 0 0 1px rgba(30,63,217,0.1)",
+        boxShadow: "0 20px 50px rgba(15,23,54,0.18), 0 0 0 1px rgba(30,63,217,0.06)",
       }}
     >
       {children}

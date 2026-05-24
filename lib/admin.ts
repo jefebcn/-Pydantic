@@ -14,6 +14,35 @@ import { NextRequest, NextResponse } from "next/server";
  * carried by the request and checks the email against the server-side list.
  */
 
+/**
+ * Resolve the authenticated user from a request (Bearer token or sb-* cookie).
+ * Returns the user + a service-role client, or a NextResponse to send back.
+ * Unlike requireAdmin this does NOT check the admin allow-list — any logged-in
+ * user passes. Used by per-user endpoints like /api/account/usage.
+ */
+export async function requireUser(
+  req: NextRequest,
+): Promise<AdminGate | { response: NextResponse }> {
+  let supabase;
+  try { supabase = supabaseServiceClient(); }
+  catch {
+    return { response: NextResponse.json(
+      { error: "Supabase non configurato" }, { status: 500 },
+    ) };
+  }
+  const auth = req.headers.get("authorization") ?? "";
+  const bearer = auth.toLowerCase().startsWith("bearer ") ? auth.slice(7).trim() : "";
+  const token = bearer || extractSbAccessToken(req);
+  if (!token) {
+    return { response: NextResponse.json({ error: "Non autenticato" }, { status: 401 }) };
+  }
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) {
+    return { response: NextResponse.json({ error: "Token non valido" }, { status: 401 }) };
+  }
+  return { user, supabase };
+}
+
 export function isAdminEmail(email: string | null | undefined): boolean {
   if (!email) return false;
   const raw = process.env.ADMIN_EMAILS ?? process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? "";

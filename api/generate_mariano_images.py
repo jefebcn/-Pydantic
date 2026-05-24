@@ -31,7 +31,7 @@ async def _download_bytes(url: str, session: aiohttp.ClientSession) -> bytes | N
     return None
 
 
-async def _run(asin: str, prompts_json: dict, cache_hit: bool) -> dict:
+async def _run(asin: str, prompts_json: dict, cache_hit: bool, user_id: str | None = None) -> dict:
     t0 = time.time()
 
     # Download up to 3 reference images from Amazon
@@ -68,6 +68,7 @@ async def _run(asin: str, prompts_json: dict, cache_hit: bool) -> dict:
         accent_color=prompts_json.get("accent_color_hex"),
         palette_hex=prompts_json.get("palette_sfondo_hex") or [],
         categoria_effetto=prompts_json.get("categoria_effetto_01b"),
+        user_id=user_id,
     )
 
     return {"images": images, "asin": asin, "duration_ms": duration_ms}
@@ -82,6 +83,9 @@ class handler(BaseHTTPRequestHandler):
         # The client tells us if the prompts.json came from cache so we can
         # log the run accurately. Defaults to False if not provided.
         cache_hit = bool(prompts_json.get("_cache_hit", False)) if isinstance(prompts_json, dict) else False
+        # Optional: the client passes the logged-in user's id so we can
+        # attribute the run (and its estimated cost) to their account.
+        user_id = (body.get("user_id") or "").strip() or None
 
         if not asin or len(asin) != 10:
             self._json(400, {"error": "ASIN non valido"})
@@ -91,7 +95,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            result = asyncio.run(_run(asin, prompts_json, cache_hit))
+            result = asyncio.run(_run(asin, prompts_json, cache_hit, user_id))
             self._json(200, result)
         except Exception as e:
             self._json(500, {"error": str(e)})

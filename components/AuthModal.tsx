@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { LOGO_ICON_SRC } from "@/lib/brand";
 
 interface Props {
   open: boolean;
@@ -67,9 +68,9 @@ export default function AuthModal({ open, onClose, defaultTab = "login" }: Props
       <div
         className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
         style={{
-          background: "#111124",
-          border: "1px solid rgba(30,63,217,0.3)",
-          boxShadow: "0 0 80px rgba(30,63,217,0.15)",
+          background: "var(--bg-card)",
+          border: "1px solid rgba(30,63,217,0.25)",
+          boxShadow: "0 20px 80px rgba(15,23,54,0.25)",
         }}
       >
         {/* Header */}
@@ -77,12 +78,11 @@ export default function AuthModal({ open, onClose, defaultTab = "login" }: Props
           style={{ borderBottom: "1px solid var(--border)" }}>
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white"
-                style={{ background: "linear-gradient(135deg, #7C3AED, #EC4899)" }}>
-                AI
-              </div>
-              <span className="text-xs font-semibold" style={{ color: "var(--purple-400)" }}>
-                Amazon Infographic AI
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={LOGO_ICON_SRC} alt="" width={28} height={28}
+                className="w-7 h-7 rounded-lg" style={{ border: "1px solid var(--border)" }} />
+              <span className="text-xs font-semibold" style={{ color: "var(--brand)" }}>
+                PYDANTIC
               </span>
             </div>
             <h2 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>

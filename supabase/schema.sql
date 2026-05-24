@@ -77,6 +77,7 @@ CREATE TRIGGER trg_mariano_cache_updated BEFORE UPDATE ON mariano_cache
 CREATE TABLE IF NOT EXISTS mariano_runs (
   id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   asin              TEXT NOT NULL,
+  user_id           TEXT,
   cache_hit         BOOLEAN DEFAULT FALSE,
   num_images_ok     INTEGER DEFAULT 0,
   num_images_failed INTEGER DEFAULT 0,
@@ -88,5 +89,8 @@ CREATE TABLE IF NOT EXISTS mariano_runs (
   models_used       TEXT[],
   created_at        TIMESTAMPTZ DEFAULT NOW()
 );
+-- If the table already exists from a previous deploy, add the new column:
+ALTER TABLE mariano_runs ADD COLUMN IF NOT EXISTS user_id TEXT;
 CREATE INDEX IF NOT EXISTS idx_mariano_runs_asin    ON mariano_runs(asin);
 CREATE INDEX IF NOT EXISTS idx_mariano_runs_created ON mariano_runs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_mariano_runs_user    ON mariano_runs(user_id);

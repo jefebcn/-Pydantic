@@ -6,6 +6,7 @@ import ImageThumb from "@/components/ImageThumb";
 import Lightbox from "@/components/Lightbox";
 import { saveRun } from "@/lib/imageStore";
 import { LOGO_ICON_SRC } from "@/lib/brand";
+import { useAuth } from "@/lib/auth-context";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -66,6 +67,7 @@ export default function HomePage() {
 function HomePageInner() {
   /* Step 1 — ASIN + prompts.json */
   const searchParams = useSearchParams();
+  const { user } = useAuth();
   const [asin, setAsin]                           = useState("");
 
   /* Pre-fill from ?asin=B0... (used by TopBar bell, search, /history clicks) */
@@ -197,7 +199,7 @@ function HomePageInner() {
       const res = await fetch("/api/generate-mariano-images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asin, prompts_json: cleanJson }),
+        body: JSON.stringify({ asin, prompts_json: cleanJson, user_id: user?.id ?? null }),
       });
       const data = await res.json();
       if (!res.ok) { setImgGenError(data.error || `HTTP ${res.status}`); return; }
