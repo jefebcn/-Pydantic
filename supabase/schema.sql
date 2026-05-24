@@ -51,9 +51,11 @@ RETURNS TRIGGER AS $$
 BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_products_updated ON products;
 CREATE TRIGGER trg_products_updated BEFORE UPDATE ON products
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+DROP TRIGGER IF EXISTS trg_jobs_updated ON jobs;
 CREATE TRIGGER trg_jobs_updated BEFORE UPDATE ON jobs
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
@@ -67,6 +69,7 @@ CREATE TABLE IF NOT EXISTS mariano_cache (
   updated_at    TIMESTAMPTZ DEFAULT NOW()
 );
 
+DROP TRIGGER IF EXISTS trg_mariano_cache_updated ON mariano_cache;
 CREATE TRIGGER trg_mariano_cache_updated BEFORE UPDATE ON mariano_cache
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
