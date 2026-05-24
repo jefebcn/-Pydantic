@@ -14,7 +14,7 @@ from http.server import BaseHTTPRequestHandler
 sys.path.insert(0, os.path.dirname(__file__))
 
 from _lib.scraper import scrape_asin
-from _lib.mariano_prompts_generator import generate_mariano_prompts
+from _lib.mariano_prompts_generator import generate_mariano_prompts, restyle
 from _lib.cache import get_mariano as cache_get, set_mariano as cache_set
 
 import aiohttp
@@ -35,11 +35,13 @@ async def _download_image_b64(url: str, session: aiohttp.ClientSession) -> dict 
         return None
 
 
-async def _run(asin: str, force_refresh: bool = False) -> dict:
-    # 0. Cache hit? (skips Rainforest + Claude entirely → saves ~$0.028)
+async def _run(asin: str, force_refresh: bool = False, style: str = "bold") -> dict:
+    # 0. Cache hit? (skips Rainforest + Claude entirely → saves ~$0.028).
+    #    The style is re-applied cheaply on top of the cached analysis.
     if not force_refresh:
         cached = cache_get(asin)
         if cached:
+            cached = restyle(cached, style)
             cached["_cache_hit"] = True
             return cached
 
@@ -55,7 +57,7 @@ async def _run(asin: str, force_refresh: bool = False) -> dict:
     images_b64 = [r for r in results if r is not None]
 
     # 3. Generate Mariano-style prompts.json
-    prompts_json = await generate_mariano_prompts(amazon_data, images_b64)
+    prompts_json = await generate_mariano_prompts(amazon_data, images_b64, style)
 
     # 4. Persist to cache (best-effort, no-op if Supabase not configured)
     cache_set(asin, prompts_json)
@@ -69,6 +71,7 @@ class handler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(length))
         asin = body.get("asin", "").strip().upper()
         force_refresh = bool(body.get("force_refresh", False))
+        style = str(body.get("style", "bold")).strip() or "bold"
 
         if not asin or len(asin) != 10:
             self.send_response(400)
@@ -78,7 +81,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            result = asyncio.run(_run(asin, force_refresh=force_refresh))
+            result = asyncio.run(_run(asin, force_refresh=force_refresh, style=style))
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()

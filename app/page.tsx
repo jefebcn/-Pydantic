@@ -11,6 +11,7 @@ import { LOGO_ICON_SRC } from "@/lib/brand";
 import { useAuth } from "@/lib/auth-context";
 import type { Overlay, OverlayEdits } from "@/lib/slideLayouts";
 import { compositeSlideToBlob } from "@/lib/renderSlide";
+import { STYLE_PRESETS, DEFAULT_STYLE, stylePreset, type StyleId } from "@/lib/styles";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -100,6 +101,7 @@ function HomePageInner() {
   const [recentAsins, setRecentAsins]             = useState<string[]>([]);
   const [editNumber, setEditNumber]               = useState<string | null>(null);   // editor open for this slide
   const [regenNumber, setRegenNumber]             = useState<string | null>(null);   // slide currently regenerating
+  const [style, setStyle]                         = useState<StyleId>(DEFAULT_STYLE);
 
   /* Refs for smooth auto-scroll */
   const step2Ref = useRef<HTMLElement | null>(null);
@@ -203,7 +205,7 @@ function HomePageInner() {
       const res = await fetch("/api/generate-mariano", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asin, force_refresh: forceRefresh }),
+        body: JSON.stringify({ asin, force_refresh: forceRefresh, style }),
       });
       const data = await res.json();
       if (!res.ok) { setMarianoError(data.error || `HTTP ${res.status}`); return; }
@@ -238,10 +240,15 @@ function HomePageInner() {
       const overlayByNum = new Map<string, Overlay | null | undefined>(
         marianoResult.images.map((im) => [im.number, im.overlay]),
       );
-      const imgs: GeneratedImage[] = (data.images ?? []).map((im: GeneratedImage) => ({
-        ...im,
-        overlay: overlayByNum.get(im.number) ?? null,
-      }));
+      const baseScale = stylePreset(style).scale;
+      const imgs: GeneratedImage[] = (data.images ?? []).map((im: GeneratedImage) => {
+        const overlay = overlayByNum.get(im.number) ?? null;
+        return {
+          ...im,
+          overlay,
+          overlayEdits: overlay ? { scale: baseScale, theme: "auto" as const } : undefined,
+        };
+      });
       setGeneratedImages(imgs);
 
       /* Persist the run to IndexedDB so /run/[asin] and the history page
@@ -254,6 +261,7 @@ function HomePageInner() {
         bullets:     marianoResult.product_bullets,
         title:       marianoResult.product_title,
         brand:       marianoResult.product_brand,
+        style,
       }).catch((e) => console.warn("[imageStore] saveRun failed:", e));
     } catch (err) {
       setImgGenError(err instanceof Error ? err.message : "Errore di rete");
@@ -271,6 +279,7 @@ function HomePageInner() {
     bullets:     marianoResult?.product_bullets,
     title:       marianoResult?.product_title,
     brand:       marianoResult?.product_brand,
+    style,
   });
 
   /* Apply a patch to one generated image (by number) + persist the run. */
@@ -522,6 +531,34 @@ function HomePageInner() {
               <span>{marianoError}</span>
             </div>
           )}
+
+          {/* Style preset selector */}
+          <div className="mt-4">
+            <p className="text-[10px] font-semibold tracking-wider uppercase mb-2" style={{ color: "var(--text-muted)" }}>
+              Stile infografico
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {STYLE_PRESETS.map((p) => {
+                const active = style === p.id;
+                return (
+                  <button key={p.id} type="button" onClick={() => setStyle(p.id)}
+                    title={p.desc}
+                    className="text-left px-3 py-2 rounded-lg transition-all"
+                    style={{
+                      background: active ? "rgba(30,63,217,0.12)" : "var(--bg-card-hover)",
+                      border: `1px solid ${active ? "rgba(30,63,217,0.4)" : "var(--border)"}`,
+                    }}>
+                    <span className="text-xs font-bold block" style={{ color: active ? "var(--brand)" : "var(--text-primary)" }}>
+                      {p.label}
+                    </span>
+                    <span className="text-[10px] leading-tight block mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      {p.desc}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <div className="mt-5 pt-4 flex flex-wrap gap-x-5 gap-y-2"
             style={{ borderTop: "1px solid rgba(30,63,217,0.06)" }}>

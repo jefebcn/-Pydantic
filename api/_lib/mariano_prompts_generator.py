@@ -370,7 +370,7 @@ def _no_text_bg_rule() -> str:
     )
 
 
-def _build_prompts(a: dict, global_rule: str, accent: str, bg: list) -> list:
+def _build_prompts(a: dict, global_rule: str, accent: str, bg: list, style: str = "bold") -> list:
     """Build the 10 per-image prompt objects from the analysis dict.
 
     Text-heavy slides (02,03,04,05,06,08,09) are generated as CLEAN background
@@ -383,10 +383,11 @@ def _build_prompts(a: dict, global_rule: str, accent: str, bg: list) -> list:
     bg3 = bg[2] if len(bg) > 2 else "#1A2A5E"
     name = a["product_name_full"]
     no_text = _no_text_bg_rule()
+    style_line = STYLE_DIRECTIVES.get(style, STYLE_DIRECTIVES["bold"]) + "\n\n"
 
     def header(num: str) -> str:
         # No baked logo anymore: the logo is part of the overlay layer too.
-        return _global_header(global_rule, _logo_line(False, num))
+        return _global_header(global_rule, _logo_line(False, num)) + style_line
 
     images = []
 
@@ -639,9 +640,18 @@ def _build_prompts(a: dict, global_rule: str, accent: str, bg: list) -> list:
     return images
 
 
+STYLE_DIRECTIVES = {
+    "bold":      "STYLE: bold, high-contrast, saturated, punchy commercial look.",
+    "minimal":   "STYLE: minimal, lots of negative space, muted/clean, refined and airy.",
+    "lifestyle": "STYLE: warm, soft, natural ambient mood, lifestyle-premium feel.",
+    "tech":      "STYLE: cool, crisp, precise, high-tech aesthetic, sharp contrast.",
+}
+
+
 async def generate_mariano_prompts(
     amazon_data: dict,
-    images_b64: list[dict]
+    images_b64: list[dict],
+    style: str = "bold",
 ) -> dict:
     """
     Main entry point. Takes Amazon product data + reference images.
@@ -704,7 +714,7 @@ async def generate_mariano_prompts(
     product_name = a.get("product_name_full", amazon_data.get("title", "Prodotto"))
     global_rule = _build_global_rule(product_name, accent)
 
-    images = _build_prompts(a, global_rule, accent, bg)
+    images = _build_prompts(a, global_rule, accent, bg, style)
 
     # Bullet points reali del listing Amazon (NON inventati): vengono presi
     # tal quali da Rainforest. Garantiamo SEMPRE almeno 5 elementi: se Amazon
@@ -726,6 +736,7 @@ async def generate_mariano_prompts(
         "product_bullets":           product_bullets,
         "product_visual_description": a.get("product_visual_description", ""),
         "categoria_effetto_01b":     a.get("categoria_effetto_01b", "energy burst neutro"),
+        "style":                     style,
         "accent_color_hex":          accent,
         "palette_sfondo_hex":        bg,
         "global_rule":               global_rule,
@@ -753,3 +764,24 @@ async def generate_mariano_prompts(
         ),
         "_analysis": a,
     }
+
+
+def restyle(prompts_json: dict, style: str) -> dict:
+    """Re-apply a visual style to a cached prompts_json WITHOUT re-calling Claude.
+    Rebuilds the per-image background prompts (which carry the style directive)
+    from the embedded `_analysis`, and updates the `style` field. The overlay
+    data is style-independent so it's preserved. No-op if `_analysis` missing
+    or style unchanged."""
+    if not isinstance(prompts_json, dict):
+        return prompts_json
+    if prompts_json.get("style") == style:
+        return prompts_json
+    a = prompts_json.get("_analysis")
+    if not isinstance(a, dict):
+        return prompts_json
+    accent = prompts_json.get("accent_color_hex", "#8B5CF6")
+    bg = prompts_json.get("palette_sfondo_hex", ["#0A0A0F", "#0D1B3E", "#1A2A5E"])
+    global_rule = prompts_json.get("global_rule", "")
+    prompts_json["images"] = _build_prompts(a, global_rule, accent, bg, style)
+    prompts_json["style"] = style
+    return prompts_json
