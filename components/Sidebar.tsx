@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import AuthModal from "@/components/AuthModal";
 import { LOGO_ICON_SRC } from "@/lib/brand";
+import { APP_VERSION_LABEL } from "@/lib/version";
 
 const navItems = [
   {
@@ -244,7 +245,7 @@ export default function Sidebar() {
       <div className="px-5 pb-4">
         <div className="rounded-lg px-3 py-1.5 text-xs text-center"
           style={{ background: "rgba(30,63,217,0.08)", color: "var(--text-muted)" }}>
-          v0.1.0 — Preview
+          {APP_VERSION_LABEL}
         </div>
       </div>
 
