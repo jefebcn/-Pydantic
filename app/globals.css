@@ -248,6 +248,10 @@ h1, h2, h3, h4, h5, h6 {
   animation: skeleton-pulse 1.8s ease-in-out infinite;
 }
 
+/* Inline-editable text affordance (SlideEditor) */
+.ce-editable:hover { box-shadow: 0 0 0 1px rgba(30,63,217,0.5); }
+.ce-editable:focus { box-shadow: 0 0 0 2px rgba(30,63,217,0.8); background: rgba(30,63,217,0.06); }
+
 /* Premium card variant for step content */
 .card-step {
   background: linear-gradient(180deg, #FFFFFF, #FCFAFA);

@@ -19,12 +19,15 @@ export interface ThumbImage {
  * triggers the direct download. Errors get a red placeholder.
  */
 export default function ImageThumb({
-  img, accent, onClick, onDownload,
+  img, accent, onClick, onDownload, onEdit, onRegenerate, regenerating,
 }: {
   img: ThumbImage;
   accent: string;
   onClick: () => void;
   onDownload: () => void;
+  onEdit?: () => void;
+  onRegenerate?: () => void;
+  regenerating?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -55,14 +58,33 @@ export default function ImageThumb({
                 <ExpandIcon /> Apri
               </div>
             </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDownload(); }}
-              className="absolute top-2 right-2 w-7 h-7 rounded-md flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all"
-              style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", color: "white" }}
-              title="Scarica questa immagine"
-            >
-              <DownloadIcon />
-            </button>
+            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+              {onEdit && img.overlay && (
+                <span role="button" tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onEdit(); }}
+                  className="w-7 h-7 rounded-md flex items-center justify-center"
+                  style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", color: "white" }}
+                  title="Modifica testo">
+                  <PencilIcon />
+                </span>
+              )}
+              {onRegenerate && (
+                <span role="button" tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); if (!regenerating) onRegenerate(); }}
+                  className="w-7 h-7 rounded-md flex items-center justify-center"
+                  style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", color: "white" }}
+                  title="Rigenera questa slide">
+                  <span className={regenerating ? "animate-spin inline-flex" : "inline-flex"}><RefreshIcon /></span>
+                </span>
+              )}
+              <span role="button" tabIndex={0}
+                onClick={(e) => { e.stopPropagation(); onDownload(); }}
+                className="w-7 h-7 rounded-md flex items-center justify-center"
+                style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(6px)", color: "white" }}
+                title="Scarica questa immagine">
+                <DownloadIcon />
+              </span>
+            </div>
           </button>
         ) : (
           <div className="w-full h-full flex flex-col items-center justify-center gap-1 p-2"
@@ -71,6 +93,11 @@ export default function ImageThumb({
             <p className="text-[10px] text-center leading-tight" style={{ color: "#F87171" }}>
               {img.error?.slice(0, 60)}
             </p>
+          </div>
+        )}
+        {regenerating && (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: "rgba(10,10,15,0.55)" }}>
+            <span className="animate-spin" style={{ color: "white" }}><RefreshIcon /></span>
           </div>
         )}
       </div>
@@ -115,6 +142,23 @@ function ExpandIcon() {
       <polyline points="9 21 3 21 3 15" />
       <line x1="21" y1="3"  x2="14" y2="10" />
       <line x1="3"  y1="21" x2="10" y2="14" />
+    </svg>
+  );
+}
+function PencilIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 20h9" />
+      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z" />
+    </svg>
+  );
+}
+function RefreshIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="23 4 23 10 17 10" />
+      <polyline points="1 20 1 14 7 14" />
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
     </svg>
   );
 }

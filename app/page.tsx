@@ -5,6 +5,7 @@ import JSZip from "jszip";
 import ImageThumb from "@/components/ImageThumb";
 import Lightbox from "@/components/Lightbox";
 import FunLoader from "@/components/FunLoader";
+import SlideEditor from "@/components/SlideEditor";
 import { saveRun } from "@/lib/imageStore";
 import { LOGO_ICON_SRC } from "@/lib/brand";
 import { useAuth } from "@/lib/auth-context";
@@ -97,6 +98,8 @@ function HomePageInner() {
   const [expandedImg, setExpandedImg]             = useState<string | null>(null);
   const [lightboxIdx, setLightboxIdx]             = useState<number | null>(null);
   const [recentAsins, setRecentAsins]             = useState<string[]>([]);
+  const [editNumber, setEditNumber]               = useState<string | null>(null);   // editor open for this slide
+  const [regenNumber, setRegenNumber]             = useState<string | null>(null);   // slide currently regenerating
 
   /* Refs for smooth auto-scroll */
   const step2Ref = useRef<HTMLElement | null>(null);
@@ -256,6 +259,57 @@ function HomePageInner() {
       setImgGenError(err instanceof Error ? err.message : "Errore di rete");
     } finally {
       setImgGenLoading(false);
+    }
+  };
+
+  /* Rebuild the RunMeta consistently for any saveRun call. */
+  const runMeta = () => ({
+    accent:      marianoResult?.accent_color_hex ?? "#1E3FD9",
+    palette:     marianoResult?.palette_sfondo_hex ?? [],
+    categoria:   marianoResult?.categoria_effetto_01b ?? "",
+    description: marianoResult?.product_visual_description,
+    bullets:     marianoResult?.product_bullets,
+    title:       marianoResult?.product_title,
+    brand:       marianoResult?.product_brand,
+  });
+
+  /* Apply a patch to one generated image (by number) + persist the run. */
+  const updateImage = (number: string, patch: Partial<GeneratedImage>) => {
+    setGeneratedImages((prev) => {
+      const next = prev.map((im) => (im.number === number ? { ...im, ...patch } : im));
+      if (asin) saveRun(asin, next, runMeta()).catch((e) => console.warn("[imageStore] saveRun:", e));
+      return next;
+    });
+  };
+
+  /* #6 editor save → store overlay + edits for the slide. */
+  const handleEditorSave = (number: string, next: { overlay: Overlay; overlayEdits: OverlayEdits }) => {
+    updateImage(number, { overlay: next.overlay, overlayEdits: next.overlayEdits });
+    setEditNumber(null);
+  };
+
+  /* #7 regenerate a single slide. */
+  const handleRegenSlide = async (number: string) => {
+    if (!marianoResult || !asin || regenNumber) return;
+    setRegenNumber(number);
+    try {
+      const { _analysis: _, ...cleanJson } = marianoResult as MarianoResult & { _analysis?: unknown };
+      const res = await fetch("/api/regenerate-slide", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ asin, prompts_json: cleanJson, slide_number: number, user_id: user?.id ?? null }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.image) { setImgGenError(data.error || `HTTP ${res.status}`); return; }
+      const overlay = marianoResult.images.find((im) => im.number === number)?.overlay ?? null;
+      updateImage(number, {
+        image_b64: data.image.image_b64, mime: data.image.mime, model: data.image.model,
+        error: data.image.error, overlay,
+      });
+    } catch (err) {
+      setImgGenError(err instanceof Error ? err.message : "Errore di rete");
+    } finally {
+      setRegenNumber(null);
     }
   };
 
@@ -803,6 +857,9 @@ function HomePageInner() {
                         if (img.image_b64 && validIdx >= 0) setLightboxIdx(validIdx);
                       }}
                       onDownload={() => downloadOne(img)}
+                      onEdit={img.overlay ? () => setEditNumber(img.number) : undefined}
+                      onRegenerate={() => handleRegenSlide(img.number)}
+                      regenerating={regenNumber === img.number}
                     />
                   );
                 })}
@@ -835,6 +892,20 @@ function HomePageInner() {
             onDownload={() => downloadOne(validImages[lightboxIdx])}
           />
         )}
+
+        {editNumber && (() => {
+          const im = generatedImages.find((g) => g.number === editNumber);
+          if (!im || !im.overlay) return null;
+          return (
+            <SlideEditor
+              number={im.number} name={im.name} imageB64={im.image_b64} mime={im.mime}
+              overlay={im.overlay} accent={marianoResult?.accent_color_hex ?? "#1E3FD9"}
+              edits={im.overlayEdits}
+              onSave={(next) => handleEditorSave(im.number, next)}
+              onClose={() => setEditNumber(null)}
+            />
+          );
+        })()}
     </main>
   );
 }
