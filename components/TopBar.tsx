@@ -33,14 +33,6 @@ function relativeTime(iso: string) {
   return `${Math.floor(h / 24)}g fa`;
 }
 
-const API_KEYS = [
-  { key: "ANTHROPIC_API_KEY",        label: "Anthropic",        color: "#A78BFA" },
-  { key: "GOOGLE_AI_API_KEY",        label: "Google AI Studio", color: "#38BDF8" },
-  { key: "OPENAI_API_KEY",           label: "OpenAI",           color: "#34D399" },
-  { key: "RAINFOREST_API_KEY",       label: "Rainforest API",   color: "#FCD34D" },
-  { key: "CLOUDFLARE_R2_BUCKET_NAME",label: "Cloudflare R2",   color: "#FB923C" },
-  { key: "NEXT_PUBLIC_SUPABASE_URL", label: "Supabase",         color: "#4ADE80" },
-];
 
 export default function TopBar() {
   const [query, setQuery]         = useState("");
@@ -180,42 +172,73 @@ export default function TopBar() {
       {/* Actions */}
       <div className="flex items-center gap-2 shrink-0" ref={panelRef}>
 
-        {/* Settings button + dropdown */}
+        {/* Info / guida button + dropdown */}
         <div className="relative">
           <TopBarBtn
-            title="Impostazioni"
+            title="Guida & info"
             active={openPanel === "settings"}
             onClick={() => setOpenPanel(openPanel === "settings" ? null : "settings")}
           >
-            <SettingsIcon />
+            <InfoIcon />
           </TopBarBtn>
 
           {openPanel === "settings" && (
-            <Dropdown align="right" width={280}>
-              <DropdownHeader title="Impostazioni" subtitle="Configura le API keys su Vercel" />
+            <Dropdown align="right" width={300}>
+              <DropdownHeader title="Come funziona" subtitle="Da ASIN a 10 infografiche in 3 passi" />
+
+              {/* 3-step quick guide */}
               <div className="flex flex-col gap-2 p-3">
-                {API_KEYS.map((k) => (
-                  <div key={k.key} className="flex items-center gap-2.5 p-2.5 rounded-lg"
+                {[
+                  { n: "1", t: "Inserisci l'ASIN", d: "Incolla l'ASIN o l'URL del prodotto Amazon." },
+                  { n: "2", t: "Genera i prompt", d: "L'AI analizza il prodotto e scrive 10 prompt." },
+                  { n: "3", t: "Scarica le immagini", d: "Render automatico, poi download singolo o ZIP." },
+                ].map((s) => (
+                  <div key={s.n} className="flex items-start gap-2.5 p-2.5 rounded-lg"
                     style={{ background: "rgba(30,63,217,0.03)", border: "1px solid rgba(30,63,217,0.06)" }}>
-                    <span className="w-2 h-2 rounded-full shrink-0"
-                      style={{ background: k.color, boxShadow: `0 0 5px ${k.color}88` }} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-mono truncate" style={{ color: k.color }}>{k.key}</p>
-                      <p className="text-xs" style={{ color: "var(--text-muted)" }}>{k.label}</p>
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 mt-0.5"
+                      style={{ background: "rgba(30,63,217,0.15)", color: "var(--brand)" }}>
+                      {s.n}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>{s.t}</p>
+                      <p className="text-[11px] leading-snug" style={{ color: "var(--text-muted)" }}>{s.d}</p>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="px-3 pb-3">
-                <a
-                  href="https://vercel.com/dashboard"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="block text-center text-xs py-2 rounded-lg font-semibold transition-all"
-                  style={{ background: "rgba(30,63,217,0.18)", color: "var(--purple-400)", border: "1px solid rgba(30,63,217,0.3)" }}
-                >
-                  Apri Vercel Dashboard →
-                </a>
+
+              {/* Cost hint */}
+              <div className="px-3 pb-2">
+                <div className="rounded-lg p-2.5 flex items-center gap-2"
+                  style={{ background: "rgba(22,163,74,0.08)", border: "1px solid rgba(22,163,74,0.2)" }}>
+                  <span className="text-base">💸</span>
+                  <p className="text-[11px] leading-snug" style={{ color: "var(--text-muted)" }}>
+                    Costo indicativo <strong style={{ color: "#15803D" }}>~$0.85</strong> per 10 immagini
+                    {" "}(~$0.82 se in cache).
+                  </p>
+                </div>
+              </div>
+
+              {/* Quick links */}
+              <div className="px-3 pb-3 grid grid-cols-2 gap-2">
+                <Link href="/account" onClick={() => setOpenPanel(null)}
+                  className="text-center text-xs py-2 rounded-lg font-semibold transition-all"
+                  style={{ background: "rgba(30,63,217,0.10)", color: "var(--brand)", border: "1px solid rgba(30,63,217,0.2)" }}>
+                  Spesa API
+                </Link>
+                <Link href="/history" onClick={() => setOpenPanel(null)}
+                  className="text-center text-xs py-2 rounded-lg font-semibold transition-all"
+                  style={{ background: "rgba(30,63,217,0.10)", color: "var(--brand)", border: "1px solid rgba(30,63,217,0.2)" }}>
+                  Cronologia
+                </Link>
+              </div>
+
+              {/* Legal footer */}
+              <div className="px-3 pb-3 flex items-center justify-center gap-3 text-[10px]"
+                style={{ borderTop: "1px solid var(--border)", paddingTop: "0.625rem" }}>
+                <Link href="/privacy" onClick={() => setOpenPanel(null)} className="hover:underline" style={{ color: "var(--text-muted)" }}>Privacy</Link>
+                <Link href="/cookies" onClick={() => setOpenPanel(null)} className="hover:underline" style={{ color: "var(--text-muted)" }}>Cookie</Link>
+                <Link href="/terms"   onClick={() => setOpenPanel(null)} className="hover:underline" style={{ color: "var(--text-muted)" }}>Termini</Link>
               </div>
             </Dropdown>
           )}
@@ -489,11 +512,12 @@ function SearchIcon() {
     </svg>
   );
 }
-function SettingsIcon() {
+function InfoIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="3" />
-      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+      <circle cx="12" cy="12" r="10" />
+      <line x1="12" y1="16" x2="12" y2="12" />
+      <line x1="12" y1="8" x2="12.01" y2="8" />
     </svg>
   );
 }
