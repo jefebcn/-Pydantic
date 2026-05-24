@@ -130,7 +130,7 @@ export default function RunPage() {
         </header>
 
         <div className="px-6 py-10 rounded-2xl"
-          style={{ background: "rgba(255,255,255,0.02)", border: "1px dashed rgba(255,255,255,0.1)" }}>
+          style={{ background: "var(--bg-card-hover)", border: "1px dashed var(--border)" }}>
           <p className="text-sm mb-3" style={{ color: "var(--text-primary)" }}>
             Le immagini di questo ASIN non sono presenti sul tuo dispositivo.
           </p>
@@ -263,7 +263,7 @@ export default function RunPage() {
       {/* Description, collapsed */}
       {run.meta.description && (
         <details className="rounded-lg mb-6 group"
-          style={{ background: "rgba(0,0,0,0.18)", border: "1px solid rgba(30,63,217,0.05)" }}>
+          style={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)" }}>
           <summary className="px-4 py-3 cursor-pointer text-xs font-semibold tracking-wider uppercase select-none flex items-center justify-between"
             style={{ color: "var(--text-muted)" }}>
             <span>Descrizione visiva prodotto</span>

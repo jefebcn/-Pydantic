@@ -715,7 +715,7 @@ function HomePageInner() {
 
               {/* Description (collapsed by default — short version) */}
               <details className="rounded-lg group"
-                style={{ background: "rgba(0,0,0,0.18)", border: "1px solid rgba(30,63,217,0.05)" }}>
+                style={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)" }}>
                 <summary className="px-4 py-3 cursor-pointer text-xs font-semibold tracking-wider uppercase select-none flex items-center justify-between"
                   style={{ color: "var(--text-muted)" }}>
                   <span>Descrizione visiva prodotto</span>
@@ -774,19 +774,19 @@ function HomePageInner() {
                 if (!img) return null;
                 return (
                   <div className="rounded-xl p-4 fade-up"
-                    style={{ background: "rgba(0,0,0,0.35)", border: `1px solid ${marianoResult.accent_color_hex}33` }}>
+                    style={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)" }}>
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
                         Prompt {img.number} — {img.name}
                       </p>
                       <button onClick={() => setExpandedImg(null)}
                         className="text-xs w-7 h-7 rounded-md flex items-center justify-center transition-all"
-                        style={{ background: "rgba(30,63,217,0.06)", color: "var(--text-muted)" }}>
+                        style={{ background: "rgba(30,63,217,0.08)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
                         ✕
                       </button>
                     </div>
                     <pre className="text-xs font-mono leading-relaxed whitespace-pre-wrap break-words overflow-auto max-h-80"
-                      style={{ color: "#A0A0C0" }}>
+                      style={{ color: "var(--text-primary)" }}>
                       {img.prompt}
                     </pre>
                   </div>
