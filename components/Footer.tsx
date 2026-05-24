@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { useCallback } from "react";
 import { LOGO_ICON_SRC } from "@/lib/brand";
+import { LEGAL_ENTITY_LINES, COPYRIGHT_HOLDER } from "@/lib/legal";
 
 const LEGAL_LINKS = [
   { href: "/privacy",  label: "Privacy Policy" },
@@ -61,12 +62,16 @@ export default function Footer() {
           </nav>
         </div>
 
-        {/* Bottom: legal small print */}
+        {/*
+          ⚖️ MANDATORY LEGAL ENTITY BLOCK — DO NOT REMOVE.
+          Statutory company data (art. 2250 c.c.). Sourced from lib/legal.ts.
+          Deleting/altering this is a compliance violation, not a UI tweak.
+        */}
         <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-3 pt-4"
           style={{ borderTop: "1px solid rgba(30,63,217,0.05)" }}>
           <div className="space-y-2">
             <p className="text-[10px] leading-relaxed" style={{ color: "var(--text-muted)" }}>
-              © {year} <span className="font-semibold" style={{ color: "var(--text-primary)" }}>LILLOFIND</span>
+              © {year} <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{COPYRIGHT_HOLDER}</span>
               {" "}· Tutti i diritti riservati.
               <span className="block sm:inline sm:ml-2 opacity-70">
                 Amazon, ASIN e i relativi loghi sono marchi di Amazon.com, Inc. — questo
@@ -75,11 +80,9 @@ export default function Footer() {
             </p>
             <ul className="text-[9px] font-mono uppercase tracking-wider space-y-0.5 opacity-80"
               style={{ color: "var(--text-muted)" }}>
-              <li>LILLOFIND S.R.L.</li>
-              <li>P.IVA IT 12874930963</li>
-              <li>REA MI — 2714501</li>
-              <li>CAP. SOC. €10.000 i.v.</li>
-              <li>TOWER A, THE WALK — JBR, DUBAI, UAE</li>
+              {LEGAL_ENTITY_LINES.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
             </ul>
           </div>
           <p className="text-[10px] font-mono shrink-0" style={{ color: "var(--text-muted)" }}>
