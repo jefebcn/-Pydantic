@@ -749,6 +749,33 @@ def _build_prompts(a: dict, global_rule: str, accent: str, bg: list, style: str 
 
 
 # ── PRESTIGE account preset (5 slides: MAIN + 4) ───────────────────────────────
+
+# Strongest possible instruction set to keep the printed packaging text identical
+# across every Prestige slide. The product is REDRAWN by the model (not pasted),
+# so these constraints push Gemini to reproduce the label faithfully.
+_PRESTIGE_LABEL_LOCK = (
+    "LABEL LOCK — ABSOLUTE PRIORITY (the #1 success criterion for this brand):\n"
+    "The reference photo is the ONLY source of truth for the packaging. Reproduce the "
+    "front-of-pack label EXACTLY, like a high-resolution photocopy:\n"
+    "- Copy EVERY printed element character-by-character: the brand wordmark, the product "
+    "name, every claim (e.g. 'Supergelée'), the capacity/weight (e.g. '160 g'), flavour, "
+    "dosage, percentages, small print, certification marks and icons.\n"
+    "- Keep the SAME fonts, letter shapes, weights, sizes, colours, capitalisation, accents "
+    "and exact spelling. Do NOT translate, re-letter, restyle, summarise, correct, re-spell "
+    "or re-order any word. Do NOT invent, add or remove any text, badge or graphic.\n"
+    "- Keep the SAME label layout and the SAME position/size of each text block and logo "
+    "relative to the packaging, and the SAME lid/cap graphics and colours.\n"
+    "- Show the product FRONT-FACING, upright, the full front label clearly visible and in "
+    "sharp focus — never rotated away, cropped, tilted past ~15°, blurred or obscured by "
+    "props. Props (fruit, gummies, leaves) must NEVER cover any text on the pack.\n"
+    "- Render the product LARGE enough that all label text is crisp and legible; if text "
+    "would be too small to read, scale the product up rather than shrink it.\n"
+    "- Identical packaging across ALL slides. Any slide whose label text differs from the "
+    "reference — even one wrong, missing, blurry, misspelled or restyled word — is a FAILURE "
+    "and must be redone.\n\n"
+)
+
+
 def _build_prestige_prompts(a: dict, global_rule: str, accent: str, bg: list) -> list:
     """Build the 5-image set in the PRESTIGE supplement-brand style:
     light tinted backgrounds, product on a glowing circular podium with sparkles
@@ -774,6 +801,7 @@ def _build_prestige_prompts(a: dict, global_rule: str, accent: str, bg: list) ->
         f"- Icons: thin-line icons inside {accent} circular outlines. Info cards: rounded WHITE "
         f"pills with a colored circular icon, a check, and big readable text.\n"
         f"- A bottom band in {accent} with a row of small white icon+label items.\n\n"
+        + _PRESTIGE_LABEL_LOCK
     )
 
     benefits = a.get("benefits_5", []) or []
@@ -783,10 +811,12 @@ def _build_prestige_prompts(a: dict, global_rule: str, accent: str, bg: list) ->
     images = []
 
     # 01a — MAIN (white background hero) — same as Generale MAIN
-    p_main = head("01a") + (
+    p_main = head("01a") + _PRESTIGE_LABEL_LOCK + (
         f"IMAGE MAIN — HERO SFONDO BIANCO:\n"
         f"Extract the {name} as a pixel-perfect cutout, centered, ~65% canvas height, slight "
-        f"15° tilt. Pure white background RGB(255,255,255). Zero text, zero logo, zero effects. "
+        f"15° tilt, front label fully visible and razor-sharp. Pure white background "
+        f"RGB(255,255,255). Zero extra text, zero added logo, zero effects (the only text "
+        f"allowed is what is printed on the product packaging itself). "
         f"Clean commercial Amazon main image."
     )
     images.append({"number": "01a", "name": "Hero Sfondo Bianco", "prompt": p_main, "logo_variant": None})
