@@ -38,13 +38,43 @@ def _pil_from_bytes(data: bytes) -> Image.Image:
     return Image.open(io.BytesIO(data)).convert("RGB")
 
 
+def _to_square_png(data: bytes, size: int = 2000) -> bytes:
+    """Force the output to an exact `size`×`size` 1:1 PNG.
+
+    Models occasionally return a non-square image. We never distort or crop
+    content: if it isn't square we pad the shorter side (centered) with the
+    image's corner colour — invisible on the solid/gradient backgrounds these
+    plates use — then resize to size×size."""
+    try:
+        im = Image.open(io.BytesIO(data)).convert("RGB")
+    except Exception:
+        return data
+    w, h = im.size
+    if w != h:
+        side = max(w, h)
+        try:
+            fill = im.getpixel((0, 0))
+        except Exception:
+            fill = (10, 10, 15)
+        canvas = Image.new("RGB", (side, side), fill)
+        canvas.paste(im, ((side - w) // 2, (side - h) // 2))
+        im = canvas
+    if im.size != (size, size):
+        im = im.resize((size, size), Image.LANCZOS)
+    out = io.BytesIO()
+    im.save(out, format="PNG", optimize=True)
+    return out.getvalue()
+
+
 async def _generate_gemini(prompt: str, ref_pils: list, slide_num: str, model_id: str) -> bytes:
     """Call Gemini (specified model) with reference images + prompt, return PNG bytes."""
     loop = asyncio.get_event_loop()
 
     def _call():
         client = _gemini_client()
-        contents = (ref_pils[:2] + [prompt]) if ref_pils else [prompt]
+        # Pass up to 3 reference photos so the model keeps the SAME product
+        # across every slide (more references = better product consistency).
+        contents = (ref_pils[:3] + [prompt]) if ref_pils else [prompt]
         resp = client.models.generate_content(
             model=model_id,
             contents=contents,
@@ -175,7 +205,7 @@ async def generate_one(
             img_bytes = await _generate_gemini(prompt, ref_pils, slide_num, model_id)
             return {
                 "number": slide_num, "name": name,
-                "image_b64": base64.b64encode(img_bytes).decode(),
+                "image_b64": base64.b64encode(_to_square_png(img_bytes)).decode(),
                 "mime": "image/png", "error": None, "model": label,
             }
         except Exception as e:
@@ -187,7 +217,7 @@ async def generate_one(
         img_bytes = await _generate_openai(prompt, ref, slide_num)
         return {
             "number": slide_num, "name": name,
-            "image_b64": base64.b64encode(img_bytes).decode(),
+            "image_b64": base64.b64encode(_to_square_png(img_bytes)).decode(),
             "mime": "image/png", "error": None, "model": "openai",
         }
     except Exception as oai_err:

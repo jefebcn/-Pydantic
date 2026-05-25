@@ -7,6 +7,7 @@ import ImageThumb, { type ThumbImage } from "@/components/ImageThumb";
 import Lightbox from "@/components/Lightbox";
 import { getRun, deleteRun, type StoredRun } from "@/lib/imageStore";
 import { compositeSlideToBlob } from "@/lib/renderSlide";
+import { amazonNames } from "@/lib/amazonNames";
 
 export default function RunPage() {
   const router = useRouter();
@@ -52,13 +53,14 @@ export default function RunPage() {
     const png = await compositeSlideToBlob({
       imageB64: img.image_b64, mime: img.mime, overlay: img.overlay, accent, edits: img.overlayEdits,
     });
+    const base = amazonNames(asin, validImages)[img.number] ?? `${asin}_${img.number}`;
     const url = URL.createObjectURL(png);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `${asin}_${img.number}_${img.name.replace(/\s+/g, "_")}.png`;
+    a.download = `${base}.png`;
     a.click();
     URL.revokeObjectURL(url);
-  }, [asin, accent]);
+  }, [asin, accent, validImages]);
 
   const downloadZip = useCallback(async () => {
     if (!validImages.length) return;
@@ -67,14 +69,13 @@ export default function RunPage() {
     try {
       const zip = new JSZip();
       const used = new Set<string>();
+      const names = amazonNames(asin, validImages);
       for (const img of validImages) {
         if (!img.image_b64) continue;
-        const safe = `${asin}_${img.number}_${img.name}`
-          .replace(/[^a-zA-Z0-9._-]+/g, "_")
-          .slice(0, 120);
-        let name = `${safe}.png`;
+        const base = names[img.number] ?? `${asin}_${img.number}`;
+        let name = `${base}.png`;
         let i = 2;
-        while (used.has(name)) { name = `${safe}_${i}.png`; i += 1; }
+        while (used.has(name)) { name = `${base}_${i}.png`; i += 1; }
         used.add(name);
         const png = await compositeSlideToBlob({
           imageB64: img.image_b64, mime: img.mime, overlay: img.overlay, accent, edits: img.overlayEdits,
