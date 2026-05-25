@@ -353,41 +353,39 @@ def _global_header(global_rule: str, logo_line: str) -> str:
     return global_rule + "\n" + logo_line + "\nALL TEXT IN IMAGES MUST BE IN ITALIAN.\nOutput: 2000x2000px | 1:1 | JPEG.\nFont: modern bold sans-serif.\n\n"
 
 
-def _no_text_bg_rule() -> str:
-    """Shared instruction block: the AI must produce a CLEAN branded background
-    with the product placed, and render ABSOLUTELY NO text/cards/icons/charts —
-    those are added client-side as an editable overlay layer."""
-    return (
-        "TEXT-FREE BACKGROUND MODE — CRITICAL:\n"
-        "This image is a BACKGROUND PLATE. Do NOT render ANY text, words, letters, "
-        "numbers, labels, badges, pills, UI cards, callout lines, icons, charts, "
-        "checkmarks, rating stars or graphic widgets of any kind. "
-        "All textual/graphic content is added later as a separate overlay layer. "
-        "Produce ONLY: the product cutout (pixel-perfect from the reference) placed "
-        "in the indicated region, plus a clean branded background. Leave the "
-        "indicated text zone as CLEAN, UNOBSTRUCTED background (gradient/pattern only, "
-        "no busy elements there) so overlay text stays readable.\n\n"
-    )
+_TEXT_QUALITY_RULE = (
+    "TEXT RENDERING — CRITICAL QUALITY RULES:\n"
+    "- Render every Italian text string EXACTLY as written, spelled correctly, "
+    "no invented/duplicated/garbled words, no Lorem Ipsum.\n"
+    "- Each text block lives in its OWN clearly separated area with generous "
+    "padding. Text blocks must NEVER overlap each other, never overlap the "
+    "product, and never get clipped at the canvas edges.\n"
+    "- Keep comfortable margins (min 5% of canvas) around every text element; "
+    "leave clear empty space between adjacent blocks.\n"
+    "- If a string is long, reduce its font size so it fits on its line/box "
+    "without colliding with neighbours — prefer smaller text over overlap.\n"
+    "- One single modern bold sans-serif family for all text. High contrast "
+    "against its background so it is always readable.\n\n"
+)
 
 
 def _build_prompts(a: dict, global_rule: str, accent: str, bg: list, style: str = "bold") -> list:
     """Build the 10 per-image prompt objects from the analysis dict.
 
-    Text-heavy slides (02,03,04,05,06,08,09) are generated as CLEAN background
-    plates (no AI-rendered text) and carry an `overlay` object with the
-    structured copy; the frontend renders that copy as an editable HTML layer.
-    Slides 01a, 01b, 07 are pure imagery and have no overlay.
-    """
+    Text is rendered directly in the image by the generation model, with strong
+    anti-overlap / anti-garble guidance (see _TEXT_QUALITY_RULE)."""
     bg1 = bg[0] if len(bg) > 0 else "#0A0A0F"
     bg2 = bg[1] if len(bg) > 1 else "#0D1B3E"
     bg3 = bg[2] if len(bg) > 2 else "#1A2A5E"
     name = a["product_name_full"]
-    no_text = _no_text_bg_rule()
     style_line = STYLE_DIRECTIVES.get(style, STYLE_DIRECTIVES["bold"]) + "\n\n"
 
     def header(num: str) -> str:
-        # No baked logo anymore: the logo is part of the overlay layer too.
-        return _global_header(global_rule, _logo_line(False, num)) + style_line
+        has_logo = num in ("02", "04", "06", "09")
+        # Text slides get the anti-overlap quality rule; image-only slides
+        # (01a/01b/07 carry no rendered copy) skip it.
+        quality = "" if num in ("01a", "01b", "07") else _TEXT_QUALITY_RULE
+        return _global_header(global_rule, _logo_line(has_logo, num)) + style_line + quality
 
     images = []
 
@@ -437,127 +435,193 @@ def _build_prompts(a: dict, global_rule: str, accent: str, bg: list, style: str 
     )
     images.append({"number": "01b", "name": f"Hero Con Effetto {effect_cat.title()}", "prompt": p01b, "logo_variant": None})
 
-    # ── 02 Benefit Principale (clean plate: product LEFT, text zone RIGHT) ─────
-    p02 = header("02") + no_text + (
-        f"IMAGE 02 — BENEFIT (background plate):\n\n"
-        f"Background: smooth dark gradient {bg1} → {bg2}, left-to-right, with a very subtle "
-        f"geometric mesh in {accent} at 4% opacity.\n"
-        f"LEFT HALF (0–50% width): product cutout ({name}, pixel-perfect from reference), "
-        f"vertically centered, ~78% of the left-zone height, soft drop shadow on the background only.\n"
-        f"RIGHT HALF (50–100% width): keep it as CLEAN dark gradient — this is the reserved text "
-        f"zone for the overlay. No elements here.\n\n"
-        f"Negative: No redrawn product. No glow ON the product. No text. No icons. No cards."
+    # ── 02 Benefit Principale ─────────────────────────────────────────────────
+    benefits_text = "\n".join(
+        f"✓ {b}" for b in a.get("benefits_5", ["Qualità superiore", "Design premium", "Tecnologia avanzata", "Facile da usare", "Garanzia inclusa"])
     )
-    images.append({
-        "number": "02", "name": "Benefit Principale", "prompt": p02, "logo_variant": "chiaro",
-        "overlay": {
-            "type": "benefit",
-            "headline": a.get("benefit_headline", "QUALITÀ SUPERIORE"),
-            "subheading": a.get("benefit_subheading", "5 motivi per sceglierlo"),
-            "benefits": a.get("benefits_5", ["Qualità superiore", "Design premium", "Tecnologia avanzata", "Facile da usare", "Garanzia inclusa"])[:5],
-            "pill": a.get("benefit_pill", "Qualità certificata · Garanzia inclusa"),
-        },
-    })
+    p02 = header("02") + (
+        f"IMAGE 02 — BENEFIT PRINCIPALE:\n\n"
+        f"Background: dark gradient {bg1} to {bg2}, left-to-right. "
+        f"Subtle geometric mesh pattern overlay at 4% opacity in {accent}. No solid color blocks.\n\n"
+        f"LEFT 55% of canvas: product cutout (pixel-perfect from reference) of the {name}. "
+        f"Position: vertically centered, product occupying ~75% of the left zone height. "
+        f"A very subtle drop shadow falls on the background only (NOT on the product): "
+        f"soft shadow, 30px blur, 15px offset right-down, 25% opacity.\n\n"
+        f"RIGHT 45% of canvas: benefit text block, vertically centered.\n"
+        f"TOP of right zone: bold white italic heading (font-size ~52px):\n"
+        f"\"{a.get('benefit_headline', 'QUALITÀ SUPERIORE')}\"\n"
+        f"Subheading below (font-size 28px, {accent}, light weight): "
+        f"\"{a.get('benefit_subheading', '5 motivi per sceglierlo')}\"\n"
+        f"Thin horizontal separator line ({accent}, 1px, 80% width of right zone).\n\n"
+        f"Then 5 benefit rows, each: checkmark icon (✓, {accent}, bold, 36px) + "
+        f"white bold text (font-size 34px), with thin 0.5px {accent} separator between rows:\n"
+        f"{benefits_text}\n\n"
+        f"BOTTOM of right zone: small accent pill badge ({accent} background, white text, 24px): "
+        f"\"{a.get('benefit_pill', 'Qualità certificata · Garanzia inclusa')}\"\n\n"
+        f"Fill the entire canvas — no empty corner, no dead space.\n\n"
+        f"{LOGO_PLACEMENT}\n\n"
+        f"Negative: No redrawn product. No glow ON the product. No effect touching the product. "
+        f"No English text. No placeholder."
+    )
+    images.append({"number": "02", "name": "Benefit Principale", "prompt": p02, "logo_variant": "chiaro"})
 
-    # ── 03 Specifiche 1 (clean plate: product LEFT, specs zone RIGHT) ──────────
-    p03 = header("03") + no_text + (
-        f"IMAGE 03 — SPECS (background plate):\n\n"
-        f"Background: very dark charcoal, faint diagonal gradient {bg1} → {bg2}.\n"
-        f"LEFT 45% width: product cutout ({name}, pixel-perfect), vertically centered, ~68% canvas height.\n"
-        f"TOP band (0–18% height) and RIGHT 55% width: keep CLEAN (gradient only) — reserved text zone "
-        f"for title + spec cards overlay. No elements there.\n\n"
-        f"Negative: No redrawn product. No text. No spec cards. No icons. No rules."
+    # ── 03 Specifiche 1 ───────────────────────────────────────────────────────
+    specs1 = a.get("specs_group_1", [])
+    spec_cards_text = "\n".join(
+        f"Spec card {i+1}:\nLabel: \"{s.get('label', 'SPEC')}\"\nValue: \"{s.get('value', '—')}\""
+        for i, s in enumerate(specs1[:6])
     )
-    images.append({
-        "number": "03", "name": "Specifiche 1", "prompt": p03, "logo_variant": None,
-        "overlay": {
-            "type": "specs",
-            "headline": a.get("specs_group_1_headline", "SPECIFICHE TECNICHE"),
-            "title": a.get("specs_group_1_title", "Connettività · Audio · Batteria"),
-            "rows": [{"label": s.get("label", "SPEC"), "value": s.get("value", "—")} for s in a.get("specs_group_1", [])[:6]],
-            "bottom": a.get("specs_group_1_bottom", "Prestazioni eccellenti, tecnologia superiore."),
-        },
-    })
+    p03 = header("03") + (
+        f"IMAGE 03 — {a.get('specs_group_1_headline', 'SPECIFICHE TECNICHE')} · "
+        f"{a.get('specs_group_1_title', 'Connettività e Funzioni').upper()}:\n\n"
+        f"Background: very dark charcoal {bg1} with a subtle diagonal texture at 6% opacity. "
+        f"Top-left to bottom-right: faint gradient from {bg1} to {bg2}.\n\n"
+        f"TOP CENTER: title text (font-size 56px, white bold): "
+        f"\"{a.get('specs_group_1_headline', 'SPECIFICHE TECNICHE')}\"\n"
+        f"Subtitle below (font-size 30px, {accent}, regular): \"{a.get('specs_group_1_title', 'Connettività · Audio · Batteria')}\"\n"
+        f"Thin full-width horizontal rule ({accent}, 1.5px) below the subtitle.\n\n"
+        f"CENTER LAYOUT: 2-column spec grid with product cutout.\n\n"
+        f"LEFT COLUMN (45% of canvas width, vertically centered):\n"
+        f"Product cutout ({name}, pixel-perfect from reference), positioned vertically centered, "
+        f"~65% of canvas height. Natural appearance, no effects on product.\n\n"
+        f"RIGHT COLUMN (50% of canvas width, top-aligned with 5% padding from top rule):\n"
+        f"Spec cards — each card: dark pill {bg2} background, {accent} left border (4px), "
+        f"white text. Font-size label 24px {accent} uppercase, value 34px white bold.\n\n"
+        f"{spec_cards_text}\n\n"
+        f"Gap between cards: 18px. Cards span the right column fully.\n\n"
+        f"BOTTOM CENTER: bold white sentence (font-size 32px): "
+        f"\"{a.get('specs_group_1_bottom', 'Prestazioni eccellenti, tecnologia superiore.')}\"\n"
+        f"Below that: thin {accent} horizontal rule full width.\n\n"
+        f"Fill the entire 2000×2000 canvas — no dead space.\n\n"
+        f"Negative: No redrawn product. No glow ON the product. No English text. "
+        f"No logo placeholder. No empty corners."
+    )
+    images.append({"number": "03", "name": "Specifiche 1", "prompt": p03, "logo_variant": None})
 
-    # ── 04 Specifiche 2 (clean plate: product CENTER band, text top+bottom) ────
-    p04 = header("04") + no_text + (
-        f"IMAGE 04 — SPECS 2 (background plate):\n\n"
-        f"Background: rich dark vertical gradient {bg2} (top) → {bg1} (bottom), faint concentric "
-        f"circles in {accent} at 3% opacity centered.\n"
-        f"CENTER band (35–65% height): product cutout ({name}, pixel-perfect), centered, ~38% canvas height.\n"
-        f"TOP band (0–32% height) and BOTTOM band (68–100% height): keep CLEAN — reserved for overlay "
-        f"cards. No elements there.\n\n"
-        f"Negative: No redrawn product. No text. No cards. No icons."
+    # ── 04 Specifiche 2 ───────────────────────────────────────────────────────
+    top_cards = a.get("specs_group_2_top_cards", [
+        {"icon": "clock", "label": "DURATA", "value": "—", "subtext": "Autonomia massima"},
+        {"icon": "lightning", "label": "RICARICA", "value": "—", "subtext": "Ricarica rapida"},
+    ])
+    bottom_cards = a.get("specs_group_2_bottom_cards", [
+        {"icon": "drop", "label": "RESISTENZA", "subtext": "Sport & outdoor"},
+        {"icon": "feather", "label": "LEGGEREZZA", "subtext": "Ultra leggero"},
+        {"icon": "gear", "label": "FUNZIONE", "subtext": "Versatile"},
+    ])
+    top_cards_text = "\n".join(
+        f"Card {chr(65+i)} — dark bg {bg2}, accent border top 4px {accent}:\n"
+        f"  Icon: {c.get('icon','clock')} symbol (simple line, {accent}, 48px)\n"
+        f"  Label (24px {accent}): \"{c.get('label','LABEL')}\"\n"
+        f"  Value (48px white bold): \"{c.get('value','—')}\"\n"
+        f"  Subtext (20px #AAAAAA): \"{c.get('subtext', '')}\""
+        for i, c in enumerate(top_cards[:2])
     )
-    images.append({
-        "number": "04", "name": "Specifiche 2", "prompt": p04, "logo_variant": "chiaro",
-        "overlay": {
-            "type": "specs2",
-            "title": a.get("specs_group_2_title", "PRESTAZIONI & COMFORT"),
-            "subheading": a.get("specs_group_2_subheading", "Progettato per durare tutto il giorno"),
-            "topCards": a.get("specs_group_2_top_cards", [
-                {"icon": "clock", "label": "DURATA", "value": "—", "subtext": "Autonomia massima"},
-                {"icon": "lightning", "label": "RICARICA", "value": "—", "subtext": "Ricarica rapida"},
-            ])[:2],
-            "bottomCards": a.get("specs_group_2_bottom_cards", [
-                {"icon": "drop", "label": "RESISTENZA", "subtext": "Sport & outdoor"},
-                {"icon": "feather", "label": "LEGGEREZZA", "subtext": "Ultra leggero"},
-                {"icon": "gear", "label": "FUNZIONE", "subtext": "Versatile"},
-            ])[:3],
-            "strip": a.get("specs_group_2_strip", "Tecnologia di ultima generazione"),
-        },
-    })
+    bottom_cards_text = "\n".join(
+        f"Card {chr(67+i)} — dark bg {bg2}, left border 4px {accent}:\n"
+        f"  Icon: {c.get('icon','gear')} ({accent}, 36px)\n"
+        f"  Label (22px {accent}): \"{c.get('label','LABEL')}\"\n"
+        f"  Subtext (20px white): \"{c.get('subtext','')}\""
+        for i, c in enumerate(bottom_cards[:3])
+    )
+    p04 = header("04") + (
+        f"IMAGE 04 — {a.get('specs_group_2_title', 'SPECIFICHE 2')} · "
+        f"{a.get('specs_group_2_subheading', 'Progettato per le massime prestazioni').upper()}:\n\n"
+        f"Background: rich dark gradient, top {bg2} to bottom {bg1}. "
+        f"Subtle concentric circle pattern (thin lines, {accent}, 3% opacity) centered at top-center.\n\n"
+        f"TOP CENTER: title (font-size 56px, white bold): \"{a.get('specs_group_2_title', 'PRESTAZIONI & COMFORT')}\"\n"
+        f"Subtitle (font-size 28px, {accent}): \"{a.get('specs_group_2_subheading', 'Progettato per durare tutto il giorno')}\"\n"
+        f"Full-width horizontal rule ({accent}, 1.5px).\n\n"
+        f"MAIN AREA: top-to-bottom layout with 2 top blocks + product + 3 bottom blocks.\n\n"
+        f"TOP BLOCK (full width, 2 cards side by side, each 46% width, 4% gap):\n"
+        f"{top_cards_text}\n\n"
+        f"CENTER: product cutout (pixel-perfect, {name}), centered horizontally, "
+        f"occupying ~38% of canvas height. Positioned between the top block and bottom block.\n\n"
+        f"BOTTOM BLOCK (full width, 3 cards side by side, each 30% width, 3% gap):\n"
+        f"{bottom_cards_text}\n\n"
+        f"BOTTOM: full-width accent bar ({accent}, 4px) at very bottom, then white text centered (26px): "
+        f"\"{a.get('specs_group_2_strip', 'Tecnologia di ultima generazione')}\"\n\n"
+        f"Fill every pixel of the 2000×2000 canvas.\n\n"
+        f"{LOGO_PLACEMENT}\n\n"
+        f"Negative: No redrawn product. No glow ON the product. No English text. No placeholder."
+    )
+    images.append({"number": "04", "name": "Specifiche 2", "prompt": p04, "logo_variant": "chiaro"})
 
-    # ── 05 Come Si Usa (clean LIGHT plate: product small bottom-center) ────────
-    p05 = header("05") + no_text + (
-        f"IMAGE 05 — USAGE (background plate):\n\n"
-        f"Background: light warm off-white #F5F5F2 with a very subtle dot-grid "
-        f"(#D9D9D9, 2px dots, 34px spacing, 35% opacity). Lightest plate of the set.\n"
-        f"BOTTOM-CENTER: product cutout ({name}, pixel-perfect), centered horizontally, "
-        f"~30% canvas height, sitting in the lower third.\n"
-        f"TOP 70% of the canvas: keep CLEAN light background — reserved for title + 3 step columns overlay.\n\n"
-        f"Negative: No redrawn product. No text. No step circles. No icons. No dividers."
+    # ── 05 Come Si Usa ────────────────────────────────────────────────────────
+    steps = a.get("usage_steps", [
+        {"step_num": 1, "verb": "PREPARA", "title": "STEP 1", "subtext": "Prepara il prodotto", "icon": "box"},
+        {"step_num": 2, "verb": "USA", "title": "STEP 2", "subtext": "Utilizza il prodotto", "icon": "hand"},
+        {"step_num": 3, "verb": "GODITI", "title": "STEP 3", "subtext": "Goditi il risultato", "icon": "star"},
+    ])
+    steps_text = "\n\n".join(
+        f"COLUMN {i+1} — STEP {s.get('step_num', i+1)}:\n"
+        f"Accent circle at top-center of column: filled circle {accent}, 80px diameter, "
+        f"white bold number \"{s.get('step_num', i+1)}\" inside (font-size 44px).\n"
+        f"Icon below circle: simple line icon of a {s.get('icon', 'arrow')} "
+        f"(#0D1B3E or dark navy, 60px).\n"
+        f"Title (font-size 34px, dark navy bold): \"{s.get('verb', 'STEP').upper()}\"\n"
+        f"Subtext (font-size 24px, #555555, regular): \"{s.get('subtext', '')}\"\n"
+        f"Below subtext: product cutout placed centrally in the lower part of the column, ~35% column height."
+        for i, s in enumerate(steps[:3])
     )
-    images.append({
-        "number": "05", "name": "Come Si Usa", "prompt": p05, "logo_variant": None,
-        "overlay": {
-            "type": "usage",
-            "title": a.get("usage_title", "COME SI USA"),
-            "subtitle": "Tre semplici passi",
-            "steps": [
-                {"num": s.get("step_num", i + 1), "verb": s.get("verb", "STEP"), "subtext": s.get("subtext", ""), "icon": s.get("icon", "arrow")}
-                for i, s in enumerate(a.get("usage_steps", [
-                    {"step_num": 1, "verb": "PREPARA", "subtext": "Prepara il prodotto", "icon": "box"},
-                    {"step_num": 2, "verb": "USA", "subtext": "Utilizza il prodotto", "icon": "hand"},
-                    {"step_num": 3, "verb": "GODITI", "subtext": "Goditi il risultato", "icon": "star"},
-                ])[:3])
-            ],
-            "strip": a.get("usage_bottom_strip", "Semplicità e qualità in ogni utilizzo"),
-            "light": True,
-        },
-    })
+    p05 = header("05") + (
+        f"IMAGE 05 — {a.get('usage_title', 'COME SI USA')} · 3 STEP:\n\n"
+        f"Background: light warm off-white #F5F5F2 with very subtle dot-grid pattern "
+        f"(#D0D0D0, 2px dots, 30px spacing, 40% opacity). This is the lightest background — "
+        f"provides maximum contrast variety.\n\n"
+        f"TOP CENTER:\n"
+        f"Title (font-size 60px, color #0D1B3E, bold): \"{a.get('usage_title', 'COME SI USA')}\"\n"
+        f"Subtitle (font-size 28px, {accent}): \"Tre semplici passi\"\n"
+        f"Full-width thin horizontal rule ({accent}, 1.5px) below.\n\n"
+        f"MAIN AREA: 3 equal columns separated by thin vertical dividers ({accent}, 1px, 60% canvas height, vertically centered).\n\n"
+        f"{steps_text}\n\n"
+        f"BOTTOM CENTER (below the 3 columns, full width):\n"
+        f"Dark pill bar (#0D1B3E, 80px tall, full width, 8px rounded corners):\n"
+        f"White text (font-size 26px): \"{a.get('usage_bottom_strip', 'Semplicità e qualità in ogni utilizzo')}\"\n\n"
+        f"Fill entire 2000×2000 canvas — no dead space.\n\n"
+        f"Negative: No redrawn product. No glow ON the product. No English text. No logo. No watermark."
+    )
+    images.append({"number": "05", "name": "Come Si Usa", "prompt": p05, "logo_variant": None})
 
-    # ── 06 Anatomia (clean plate: product CENTER large, margins clean) ─────────
-    p06 = header("06") + no_text + (
-        f"IMAGE 06 — ANATOMY (background plate):\n\n"
-        f"Background: very dark technical {bg1} with a faint circuit-board line pattern in {accent} "
-        f"at 5% opacity (1px lines, junction dots).\n"
-        f"CENTER: large product cutout ({name}, pixel-perfect), centered, ~70% canvas height, "
-        f"frontal view angled ~10°.\n"
-        f"TOP band (0–16% height) and the LEFT/RIGHT margins: keep CLEAN — reserved for the title and "
-        f"the part labels overlay. No callout lines, no labels drawn.\n\n"
-        f"Negative: No redrawn product. No text. No callout lines. No labels. No pills."
+    # ── 06 Anatomia ───────────────────────────────────────────────────────────
+    parts = a.get("anatomy_parts", [
+        {"label": "Componente principale", "location": "center"},
+        {"label": "Connettore", "location": "bottom"},
+        {"label": "Superficie principale", "location": "top"},
+        {"label": "Elemento laterale", "location": "left"},
+        {"label": "Dettaglio tecnico", "location": "right"},
+    ])
+    parts_text = "\n".join(
+        f"→ {p.get('location', 'area').upper()} area (pointing to {p.get('location','this area')} of product):\n"
+        f"  Label (top/bottom/left/right quadrant accordingly): \"{p.get('label', 'Componente')}\""
+        for p in parts[:6]
     )
-    images.append({
-        "number": "06", "name": "Anatomia del Prodotto", "prompt": p06, "logo_variant": "chiaro",
-        "overlay": {
-            "type": "anatomy",
-            "title": a.get("anatomy_title", "ANATOMIA"),
-            "subtitle": "Ogni dettaglio, al suo posto",
-            "parts": [{"label": p.get("label", "Componente"), "location": p.get("location", "right")} for p in a.get("anatomy_parts", [])[:6]],
-            "bottom": a.get("anatomy_bottom", "Precisione e qualità in ogni componente"),
-        },
-    })
+    p06 = header("06") + (
+        f"IMAGE 06 — {a.get('anatomy_title', 'ANATOMIA DEL PRODOTTO')}:\n\n"
+        f"Background: very dark technical {bg1} with a subtle blue circuit-board line pattern "
+        f"at 5% opacity ({accent} lines, 1px, grid with small junction dots).\n\n"
+        f"TOP CENTER:\n"
+        f"Title (font-size 62px, white bold): \"{a.get('anatomy_title', 'ANATOMIA')}\"\n"
+        f"Subtitle (font-size 30px, {accent}): \"Ogni dettaglio, al suo posto\"\n"
+        f"Thin horizontal rule ({accent}, 1.5px, full width).\n\n"
+        f"CENTER: large product cutout ({name}, pixel-perfect from reference), "
+        f"positioned at center of canvas, occupying ~72% of canvas height and ~55% of canvas width. "
+        f"The product is frontal view slightly angled 10° to show main surfaces. The product is the focal point.\n\n"
+        f"CALLOUT ARROWS — all callout lines are thin ({accent}, 1.5px) straight lines with a small "
+        f"filled circle ({accent}, 6px) at the product contact point and an arrowhead at the label end. "
+        f"Labels are white bold text (font-size 30px) on small dark pill backgrounds "
+        f"({bg2}, 12px padding, 6px rounded, {accent} border 1px):\n\n"
+        f"{parts_text}\n\n"
+        f"All callout lines radiate outward from the product to the margins — "
+        f"they do NOT cross the product body. Labels placed in the 4 margin quadrants around the product.\n\n"
+        f"BOTTOM CENTER:\n"
+        f"Full-width accent strip ({accent}, 6px height).\n"
+        f"Below strip on dark bg: white text (font-size 26px, centered): "
+        f"\"{a.get('anatomy_bottom', 'Precisione e qualità in ogni componente')}\"\n\n"
+        f"Fill entire canvas — no dead space.\n\n"
+        f"{LOGO_PLACEMENT}\n\n"
+        f"Negative: No redrawn product. No glow ON the product. No English text. No placeholder."
+    )
+    images.append({"number": "06", "name": "Anatomia del Prodotto", "prompt": p06, "logo_variant": "chiaro"})
 
     # ── 07 Lifestyle ──────────────────────────────────────────────────────────
     lifestyle = a.get("lifestyle_scene",
@@ -580,62 +644,84 @@ def _build_prompts(a: dict, global_rule: str, accent: str, bg: list, style: str 
     )
     images.append({"number": "07", "name": "Lifestyle", "prompt": p07, "logo_variant": None})
 
-    # ── 08 Dove Usarlo (clean plate: product small bottom, 2×2 zone clean) ─────
-    p08 = header("08") + no_text + (
-        f"IMAGE 08 — SCENARIOS (background plate):\n\n"
-        f"Background: deep dark blue-black {bg1}, faint radial gradient center {bg2} → edges {bg1}.\n"
-        f"BOTTOM-CENTER: product cutout ({name}, pixel-perfect), centered horizontally, "
-        f"~20% canvas height, in the lower area.\n"
-        f"TOP 75% of the canvas: keep CLEAN — reserved for the title + a 2×2 grid of scenario cards "
-        f"overlay. No cards, no icons, no grid lines drawn.\n\n"
-        f"Negative: No redrawn product. No text. No cards. No icons."
+    # ── 08 Dove Usarlo ────────────────────────────────────────────────────────
+    scenarios = a.get("usage_scenarios", [
+        {"icon": "home", "title": "IN CASA", "subtext": "Uso domestico quotidiano"},
+        {"icon": "briefcase", "title": "IN UFFICIO", "subtext": "Produttività professionale"},
+        {"icon": "airplane", "title": "IN VIAGGIO", "subtext": "Compagno di viaggio"},
+        {"icon": "sport", "title": "SPORT", "subtext": "Attività fisica e outdoor"},
+    ])
+    scenario_cards = "\n\n".join(
+        f"CARD {'TOP-LEFT' if i==0 else 'TOP-RIGHT' if i==1 else 'BOTTOM-LEFT' if i==2 else 'BOTTOM-RIGHT'}:\n"
+        f"Icon (top-center of card): {s.get('icon','star')} silhouette, {accent}, 70px.\n"
+        f"Title (font-size 38px, white bold): \"{s.get('title','SCENARIO')}\"\n"
+        f"Subtext (font-size 24px, #AAAAAA): \"{s.get('subtext','Descrizione breve')}\"\n"
+        f"Small accent dot ({accent}, 8px) bottom-right of card."
+        for i, s in enumerate(scenarios[:4])
     )
-    images.append({
-        "number": "08", "name": "Dove Usarlo", "prompt": p08, "logo_variant": None,
-        "overlay": {
-            "type": "scenarios",
-            "title": a.get("usage_scenarios_title", "USALO OVUNQUE"),
-            "subtitle": a.get("usage_scenarios_subtitle", "Adatto ad ogni momento della giornata"),
-            "scenarios": a.get("usage_scenarios", [
-                {"icon": "home", "title": "IN CASA", "subtext": "Uso domestico quotidiano"},
-                {"icon": "briefcase", "title": "IN UFFICIO", "subtext": "Produttività professionale"},
-                {"icon": "airplane", "title": "IN VIAGGIO", "subtext": "Compagno di viaggio"},
-                {"icon": "sport", "title": "SPORT", "subtext": "Attività fisica e outdoor"},
-            ])[:4],
-            "left": a.get("usage_product_strip_left", "Qualità garantita"),
-            "right": a.get("usage_product_strip_right", "Sempre con te"),
-            "caption": a.get("usage_bottom_caption", "Un prodotto. Infinite possibilità."),
-        },
-    })
+    p08 = header("08") + (
+        f"IMAGE 08 — {a.get('usage_scenarios_title', 'DOVE USARLO')}:\n\n"
+        f"Background: deep dark blue-black {bg1} with very faint radial gradient center {bg2} "
+        f"to edges {bg1}. Four-quadrant grid layout. Subtle thin grid cross lines in the center "
+        f"(1px, {accent}, 15% opacity) dividing the 4 quadrants.\n\n"
+        f"TOP CENTER (above the 2×2 grid):\n"
+        f"Title (font-size 60px, white bold): \"{a.get('usage_scenarios_title', 'USALO OVUNQUE')}\"\n"
+        f"Subtitle (font-size 28px, {accent}): \"{a.get('usage_scenarios_subtitle', 'Adatto ad ogni momento della giornata')}\"\n"
+        f"Thin rule ({accent}, 1.5px, full width).\n\n"
+        f"MAIN AREA: 2×2 grid, 4 scenario cards. Each card occupies one quadrant. "
+        f"Cards have background {bg2}, rounded corners 16px, border 1.5px {accent}, internal padding 30px.\n\n"
+        f"{scenario_cards}\n\n"
+        f"BOTTOM CENTER (below the 2×2 grid): product cutout ({name}, pixel-perfect) "
+        f"centered horizontally, occupying ~20% of canvas height. "
+        f"On each side of the product: accent text in {accent} (font-size 24px) — "
+        f"LEFT: \"{a.get('usage_product_strip_left', 'Qualità garantita')}\" — "
+        f"RIGHT: \"{a.get('usage_product_strip_right', 'Sempre con te')}\". "
+        f"White centered caption below product (font-size 22px, #AAAAAA): "
+        f"\"{a.get('usage_bottom_caption', 'Un prodotto. Infinite possibilità.')}\"\n\n"
+        f"Full canvas 2000×2000 filled with content — no dead space.\n\n"
+        f"Negative: No redrawn product. No glow ON the product. No English text. No logo. No placeholder."
+    )
+    images.append({"number": "08", "name": "Dove Usarlo", "prompt": p08, "logo_variant": None})
 
-    # ── 09 Garanzia e Trust (clean plate: product small bottom, 2×2 zone clean)─
-    p09 = header("09") + no_text + (
-        f"IMAGE 09 — TRUST (background plate):\n\n"
-        f"Background: very deep midnight {bg1} with a faint diamond/rhombus pattern in {accent} at "
-        f"4% opacity, subtle corner vignette. Premium, reassuring mood.\n"
-        f"BOTTOM-CENTER: product cutout ({name}, pixel-perfect), centered horizontally, "
-        f"~18% canvas height, in the lower area.\n"
-        f"TOP 75% of the canvas: keep CLEAN — reserved for the title + a 2×2 grid of trust badges "
-        f"overlay. No cards, no badges, no icons drawn.\n\n"
-        f"Negative: No redrawn product. No text. No cards. No icons. No frame."
+    # ── 09 Garanzia e Trust ───────────────────────────────────────────────────
+    trust_badges = a.get("trust_badges", [
+        {"icon": "shield", "title": "GARANZIA 12 MESI", "subtext": "Sostituzione o rimborso garantito"},
+        {"icon": "truck", "title": "SPEDIZIONE RAPIDA", "subtext": "Consegna veloce in tutta Italia"},
+        {"icon": "certificate", "title": "QUALITÀ TESTATA", "subtext": "Prodotto certificato e approvato"},
+        {"icon": "headset", "title": "SUPPORTO CLIENTI", "subtext": "Assistenza dedicata sempre disponibile"},
+    ])
+    trust_cards_text = "\n\n".join(
+        f"CARD {'TOP-LEFT' if i==0 else 'TOP-RIGHT' if i==1 else 'BOTTOM-LEFT' if i==2 else 'BOTTOM-RIGHT'} "
+        f"— background {bg2}, border 1.5px {accent}, rounded 20px, padding 40px:\n"
+        f"Icon (top-center): {t.get('icon','shield')} with checkmark, {accent}, 80px.\n"
+        f"Title (font-size 40px, white bold): \"{t.get('title', 'GARANZIA')}\"\n"
+        f"Subtext (font-size 24px, #AAAAAA): \"{t.get('subtext', '')}\""
+        for i, t in enumerate(trust_badges[:4])
     )
-    images.append({
-        "number": "09", "name": "Garanzia e Trust", "prompt": p09, "logo_variant": "chiaro",
-        "overlay": {
-            "type": "trust",
-            "title": a.get("trust_title", "ACQUISTO PROTETTO"),
-            "subtitle": a.get("trust_subtitle", "La nostra promessa per te"),
-            "badges": a.get("trust_badges", [
-                {"icon": "shield", "title": "GARANZIA 12 MESI", "subtext": "Sostituzione o rimborso garantito"},
-                {"icon": "truck", "title": "SPEDIZIONE RAPIDA", "subtext": "Consegna veloce in tutta Italia"},
-                {"icon": "certificate", "title": "QUALITÀ TESTATA", "subtext": "Prodotto certificato e approvato"},
-                {"icon": "headset", "title": "SUPPORTO CLIENTI", "subtext": "Assistenza dedicata sempre disponibile"},
-            ])[:4],
-            "left": a.get("trust_product_left", "Prodotto verificato"),
-            "right": a.get("trust_product_right", "Qualità garantita"),
-            "tagline": a.get("trust_tagline", "Scelto da chi non scende a compromessi."),
-        },
-    })
+    p09 = header("09") + (
+        f"IMAGE 09 — {a.get('trust_title', 'ACQUISTO PROTETTO')}:\n\n"
+        f"Background: very deep midnight {bg1} with a faint repeating diamond/rhombus geometric "
+        f"pattern at 4% opacity in {accent}. Outer edge: very subtle vignette darkening to pure "
+        f"black at corners. Overall mood: premium, reassuring, serious.\n\n"
+        f"OUTER FRAME: thin border 3px {accent} at 80% opacity, inset 20px from all canvas edges.\n\n"
+        f"TOP CENTER:\n"
+        f"Title (font-size 64px, white bold): \"{a.get('trust_title', 'ACQUISTO PROTETTO')}\"\n"
+        f"Subtitle (font-size 28px, {accent}): \"{a.get('trust_subtitle', 'La nostra promessa per te')}\"\n"
+        f"Full-width horizontal rule ({accent}, 2px).\n\n"
+        f"MAIN AREA: 2×2 grid of 4 trust cards.\n\n"
+        f"{trust_cards_text}\n\n"
+        f"BOTTOM CENTER (below the 2×2 grid): product cutout ({name}, pixel-perfect), "
+        f"centered horizontally, occupying ~18% of canvas height. "
+        f"On each side of the product in {accent} text (font-size 22px): "
+        f"LEFT: \"{a.get('trust_product_left', 'Prodotto verificato')}\" — "
+        f"RIGHT: \"{a.get('trust_product_right', 'Qualità garantita')}\".\n"
+        f"Below product: white text centered (font-size 24px): "
+        f"\"{a.get('trust_tagline', 'Scelto da chi non scende a compromessi.')}\"\n\n"
+        f"Full 2000×2000 canvas filled — no dead space.\n\n"
+        f"{LOGO_PLACEMENT}\n\n"
+        f"Negative: No redrawn product. No glow ON the product. No English text. No placeholder."
+    )
+    images.append({"number": "09", "name": "Garanzia e Trust", "prompt": p09, "logo_variant": "chiaro"})
 
     return images
 
@@ -742,10 +828,9 @@ async def generate_mariano_prompts(
         "global_rule":               global_rule,
         "images":                    images,
         "negative_prompt": (
-            "ABSOLUTELY NO TEXT of any kind: no words, no letters, no numbers, no labels, "
-            "no titles, no captions, no badges, no pills, no UI cards, no callout lines, "
-            "no icons, no charts, no rating stars, no checkmarks — all text/graphics are "
-            "added later as a separate overlay layer. "
+            "No overlapping text. No text blocks colliding with each other or with "
+            "the product. No text clipped or cut off at the edges. No text running "
+            "off-canvas. No cramped/crowded layout. "
             "No redrawn product. No illustrated or cartoon style product. "
             "No product recreated from scratch. No glow or color effect applied directly ON the product. "
             "No shape or proportion alteration of the product. "
