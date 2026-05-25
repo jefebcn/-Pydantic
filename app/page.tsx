@@ -46,6 +46,13 @@ const RECENT_KEY = "recent_asins_v1";
 const MAX_RECENTS = 5;
 const ASIN_RE = /^[A-Z0-9]{10}$/;
 
+/* Free tier: a logged-out visitor gets ONE full generation, then must sign in.
+   Tracked client-side (localStorage) — a soft gate, not a hard security
+   boundary (clearing storage resets it). The real enforcement will come with
+   server-side credits/billing. */
+const GUEST_KEY = "guest_runs_v1";
+const GUEST_LIMIT = 1;
+
 /**
  * Extract a clean 10-char ASIN from a user paste. Accepts:
  *   - bare ASIN: "B08N5WRWNW"
@@ -102,6 +109,23 @@ function HomePageInner() {
   const [editNumber, setEditNumber]               = useState<string | null>(null);   // editor open for this slide
   const [regenNumber, setRegenNumber]             = useState<string | null>(null);   // slide currently regenerating
   const [style, setStyle]                         = useState<StyleId>(DEFAULT_STYLE);
+
+  /* ── Free-tier guest gate ─────────────────────────────────────────────── */
+  const [guestRuns, setGuestRuns] = useState(0);
+  useEffect(() => {
+    try { setGuestRuns(parseInt(localStorage.getItem(GUEST_KEY) || "0", 10) || 0); } catch { /* no-op */ }
+  }, []);
+  const guestBlocked = !user && guestRuns >= GUEST_LIMIT;
+  const requireLogin = () =>
+    document.dispatchEvent(new CustomEvent("open-auth-modal", { detail: "register" }));
+  const consumeGuestRun = () => {
+    if (user) return;
+    setGuestRuns((n) => {
+      const v = n + 1;
+      try { localStorage.setItem(GUEST_KEY, String(v)); } catch { /* no-op */ }
+      return v;
+    });
+  };
 
   /* Refs for smooth auto-scroll */
   const step2Ref = useRef<HTMLElement | null>(null);
@@ -195,6 +219,11 @@ function HomePageInner() {
       setMarianoError("ASIN deve essere 10 caratteri alfanumerici");
       return;
     }
+    if (guestBlocked) {
+      setMarianoError("Hai esaurito la run gratuita. Accedi per continuare a generare.");
+      requireLogin();
+      return;
+    }
     setMarianoLoading(true);
     setMarianoError(null);
     setMarianoResult(null);
@@ -220,6 +249,11 @@ function HomePageInner() {
 
   const handleGenerateImages = async () => {
     if (!marianoResult || !asin) return;
+    if (guestBlocked) {
+      setImgGenError("Hai esaurito la run gratuita. Accedi per generare le immagini.");
+      requireLogin();
+      return;
+    }
     setImgGenLoading(true);
     setImgGenError(null);
     setGeneratedImages([]);
@@ -250,6 +284,7 @@ function HomePageInner() {
         };
       });
       setGeneratedImages(imgs);
+      if (imgs.some((im) => im.image_b64)) consumeGuestRun();   // free run used
 
       /* Persist the run to IndexedDB so /run/[asin] and the history page
          can show the gallery later without re-running the pipeline. */
@@ -436,6 +471,27 @@ function HomePageInner() {
           title="Inserisci l'ASIN"
           subtitle="Un ASIN Amazon italiano (10 caratteri alfanumerici)"
         >
+          {!user && (
+            <div className="mb-4 px-4 py-3 rounded-xl flex items-center gap-3 flex-wrap"
+              style={{
+                background: guestBlocked ? "rgba(239,68,68,0.08)" : "rgba(30,63,217,0.06)",
+                border: `1px solid ${guestBlocked ? "rgba(239,68,68,0.3)" : "rgba(30,63,217,0.2)"}`,
+              }}>
+              <span className="text-base">{guestBlocked ? "🔒" : "🎁"}</span>
+              <p className="text-xs flex-1 min-w-0" style={{ color: "var(--text-primary)" }}>
+                {guestBlocked ? (
+                  <>Hai usato la tua <strong>run gratuita</strong>. Accedi per generazioni illimitate e per salvare la cronologia.</>
+                ) : (
+                  <>Stai usando PYDANTIC come ospite: hai <strong>1 generazione gratuita</strong>. Poi serve l&apos;accesso.</>
+                )}
+              </p>
+              <button type="button"
+                onClick={() => document.dispatchEvent(new CustomEvent("open-auth-modal", { detail: guestBlocked ? "login" : "register" }))}
+                className="btn-primary text-xs shrink-0" style={{ padding: "0.5rem 1rem" }}>
+                {guestBlocked ? "Accedi" : "Crea account"}
+              </button>
+            </div>
+          )}
           <form
             onSubmit={(e) => { e.preventDefault(); generatePrompts(false); }}
             className="flex flex-col sm:flex-row gap-3"
@@ -480,7 +536,7 @@ function HomePageInner() {
             </div>
             <button
               type="submit"
-              disabled={marianoLoading || asin.length !== 10}
+              disabled={marianoLoading || asin.length !== 10 || guestBlocked}
               className="btn-primary whitespace-nowrap text-base"
               style={{ padding: "1rem 1.75rem" }}
             >
@@ -806,7 +862,7 @@ function HomePageInner() {
                 </div>
                 <button
                   onClick={handleGenerateImages}
-                  disabled={imgGenLoading}
+                  disabled={imgGenLoading || guestBlocked}
                   className="btn-primary whitespace-nowrap"
                 >
                   {imgGenLoading
