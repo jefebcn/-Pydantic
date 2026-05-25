@@ -243,17 +243,41 @@ async def generate_all(
     - `slide_numbers`: if given, only these slide numbers are generated.
     - `quality`: "quality" (Pro on text slides) or "fast" (all Flash).
     Runs in batches of `parallel` to avoid rate limits.
+
+    Product-consistency anchor: if the white-background hero (01a) is among the
+    slides to generate, it is produced FIRST and then fed as an extra reference
+    image to the other slides — so every slide anchors to the same freshly
+    generated product "portrait", keeping the product identical across the set.
+    No extra cost: 01a is a slide we were generating anyway.
     """
     images_data = prompts_json.get("images", [])
     if slide_numbers:
         wanted = {str(n) for n in slide_numbers}
         images_data = [im for im in images_data if str(im.get("number")) in wanted]
-    results = []
 
-    for i in range(0, len(images_data), parallel):
-        batch = images_data[i:i + parallel]
+    results: list[dict] = []
+    extra_refs: list = []
+    rest = images_data
+
+    anchor_idx = next((i for i, im in enumerate(images_data) if str(im.get("number")) == "01a"), -1)
+    if anchor_idx != -1:
+        main_res = await generate_one(images_data[anchor_idx], ref_pils, ref_bytes_list, quality)
+        results.append(main_res)
+        if main_res.get("image_b64"):
+            try:
+                extra_refs = [_pil_from_bytes(base64.b64decode(main_res["image_b64"]))]
+            except Exception:
+                extra_refs = []
+        rest = [im for j, im in enumerate(images_data) if j != anchor_idx]
+
+    # The freshly generated MAIN goes FIRST in the reference list so the model
+    # leans on it for product identity (background still comes from each prompt).
+    aug_refs = (extra_refs + ref_pils) if extra_refs else ref_pils
+
+    for i in range(0, len(rest), parallel):
+        batch = rest[i:i + parallel]
         batch_results = await asyncio.gather(*[
-            generate_one(img, ref_pils, ref_bytes_list, quality)
+            generate_one(img, aug_refs, ref_bytes_list, quality)
             for img in batch
         ])
         results.extend(batch_results)

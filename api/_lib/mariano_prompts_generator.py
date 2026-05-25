@@ -303,6 +303,8 @@ def _build_global_rule(product_name: str, accent: str) -> str:
         f"similar-looking product, never re-imagined. Copy it faithfully from the "
         f"reference; if in doubt, reproduce the reference exactly. A product that "
         f"differs from the reference is a FAILURE.\n"
+        f"Reference images define the PRODUCT ONLY — never copy their background or "
+        f"composition. Each image uses the background described in its own prompt.\n"
         f"\n"
         f"ASPECT RATIO — CRITICAL: the output MUST be a perfect SQUARE 1:1 "
         f"(2000×2000). Never 4:3, never 16:9, never portrait. Compose for a square canvas.\n"
