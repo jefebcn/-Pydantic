@@ -134,17 +134,28 @@ async def generate_one(
     img_data: dict,
     ref_pils: list,
     ref_bytes_list: list[bytes],
+    quality: str = "quality",
 ) -> dict:
-    """Generate a single image. Returns dict with number/name/image_b64/error."""
+    """Generate a single image. Returns dict with number/name/image_b64/error.
+
+    quality:
+      - "quality" (default): text-heavy slides use Pro first (best text), others
+        Flash first. Best fidelity, higher cost.
+      - "fast": every slide uses Flash first (Pro only as fallback). ~Half the
+        cost; text rendering slightly weaker.
+    """
     slide_num = img_data["number"]
     prompt    = img_data["prompt"]
     name      = img_data["name"]
 
-    # Cascade strategy depends on text-density of the slide:
-    #  - text-heavy slides → Pro first (best text fidelity), Flash fallback, OpenAI last
-    #  - text-light slides → Flash first (cheaper/faster), Pro fallback, OpenAI last
+    # Cascade strategy depends on quality mode + text-density of the slide.
     errors: list[str] = []
-    if _is_text_heavy(slide_num):
+    if quality == "fast":
+        cascade = [
+            ("gemini-flash", cfg.NB_FALLBACK_MODEL),  # cheap first, everywhere
+            ("gemini-pro",   cfg.NB2_MODEL),
+        ]
+    elif _is_text_heavy(slide_num):
         cascade = [
             ("gemini-pro",   cfg.NB2_MODEL),          # default: gemini-3-pro-image-preview
             ("gemini-flash", cfg.NB_FALLBACK_MODEL),  # default: gemini-2.5-flash-image
@@ -194,18 +205,25 @@ async def generate_all(
     ref_pils: list,
     ref_bytes_list: list[bytes],
     parallel: int = 3,
+    quality: str = "quality",
+    slide_numbers: list[str] | None = None,
 ) -> list[dict]:
     """
-    Generate all images from prompts_json.
+    Generate images from prompts_json.
+    - `slide_numbers`: if given, only these slide numbers are generated.
+    - `quality`: "quality" (Pro on text slides) or "fast" (all Flash).
     Runs in batches of `parallel` to avoid rate limits.
     """
     images_data = prompts_json.get("images", [])
+    if slide_numbers:
+        wanted = {str(n) for n in slide_numbers}
+        images_data = [im for im in images_data if str(im.get("number")) in wanted]
     results = []
 
     for i in range(0, len(images_data), parallel):
         batch = images_data[i:i + parallel]
         batch_results = await asyncio.gather(*[
-            generate_one(img, ref_pils, ref_bytes_list)
+            generate_one(img, ref_pils, ref_bytes_list, quality)
             for img in batch
         ])
         results.extend(batch_results)

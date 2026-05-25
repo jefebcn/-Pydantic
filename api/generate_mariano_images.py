@@ -31,7 +31,8 @@ async def _download_bytes(url: str, session: aiohttp.ClientSession) -> bytes | N
     return None
 
 
-async def _run(asin: str, prompts_json: dict, cache_hit: bool, user_id: str | None = None) -> dict:
+async def _run(asin: str, prompts_json: dict, cache_hit: bool, user_id: str | None = None,
+               quality: str = "quality", slide_numbers: list | None = None) -> dict:
     t0 = time.time()
 
     # Download up to 3 reference images from Amazon
@@ -53,9 +54,11 @@ async def _run(asin: str, prompts_json: dict, cache_hit: bool, user_id: str | No
             except Exception:
                 pass
 
-    # Generate all 10 images (parallel=5 → 2 batches of 5, faster than 4 batches of 3
-    # which matters with Nano Banana Pro being ~2× slower than Flash)
-    images = await generate_all(prompts_json, ref_pils, ref_bytes_list, parallel=5)
+    # Generate the requested slides (parallel=5). quality "fast" forces Flash.
+    images = await generate_all(
+        prompts_json, ref_pils, ref_bytes_list,
+        parallel=5, quality=quality, slide_numbers=slide_numbers,
+    )
 
     duration_ms = int((time.time() - t0) * 1000)
 
@@ -86,6 +89,10 @@ class handler(BaseHTTPRequestHandler):
         # Optional: the client passes the logged-in user's id so we can
         # attribute the run (and its estimated cost) to their account.
         user_id = (body.get("user_id") or "").strip() or None
+        quality = "fast" if str(body.get("quality", "quality")) == "fast" else "quality"
+        slide_numbers = body.get("slide_numbers") or None
+        if slide_numbers is not None and not isinstance(slide_numbers, list):
+            slide_numbers = None
 
         if not asin or len(asin) != 10:
             self._json(400, {"error": "ASIN non valido"})
@@ -95,7 +102,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            result = asyncio.run(_run(asin, prompts_json, cache_hit, user_id))
+            result = asyncio.run(_run(asin, prompts_json, cache_hit, user_id, quality, slide_numbers))
             self._json(200, result)
         except Exception as e:
             self._json(500, {"error": str(e)})

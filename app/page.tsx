@@ -109,6 +109,8 @@ function HomePageInner() {
   const [editNumber, setEditNumber]               = useState<string | null>(null);   // editor open for this slide
   const [regenNumber, setRegenNumber]             = useState<string | null>(null);   // slide currently regenerating
   const [style, setStyle]                         = useState<StyleId>(DEFAULT_STYLE);
+  const [quality, setQuality]                     = useState<"quality" | "fast">("quality");
+  const [selectedSlides, setSelectedSlides]       = useState<Set<string>>(new Set());
 
   /* ── Free-tier guest gate ─────────────────────────────────────────────── */
   const [guestRuns, setGuestRuns] = useState(0);
@@ -239,6 +241,8 @@ function HomePageInner() {
       const data = await res.json();
       if (!res.ok) { setMarianoError(data.error || `HTTP ${res.status}`); return; }
       setMarianoResult(data as MarianoResult);
+      // default: all slides selected
+      setSelectedSlides(new Set((data.images ?? []).map((im: { number: string }) => im.number)));
       pushRecent(asin);
     } catch (err) {
       setMarianoError(err instanceof Error ? err.message : "Errore di rete");
@@ -261,10 +265,16 @@ function HomePageInner() {
     try {
       const { _analysis: _, ...cleanJson } =
         marianoResult as MarianoResult & { _analysis?: unknown };
+      const slideNums = marianoResult.images
+        .map((im) => im.number)
+        .filter((n) => selectedSlides.size === 0 || selectedSlides.has(n));
       const res = await fetch("/api/generate-mariano-images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asin, prompts_json: cleanJson, user_id: user?.id ?? null }),
+        body: JSON.stringify({
+          asin, prompts_json: cleanJson, user_id: user?.id ?? null,
+          quality, slide_numbers: slideNums,
+        }),
       });
       const data = await res.json();
       if (!res.ok) { setImgGenError(data.error || `HTTP ${res.status}`); return; }
@@ -426,14 +436,21 @@ function HomePageInner() {
   };
 
   /* ── Cost estimate (display only) ─────────────────────────────────────── */
+  const TEXT_HEAVY = useMemo(() => new Set(["02", "03", "04", "05", "06", "08", "09"]), []);
   const costEstimate = useMemo(() => {
     if (!marianoResult) return null;
     const cached = marianoResult._cache_hit;
-    const rainforest = cached ? 0 : 0.003;
-    const claude     = cached ? 0 : 0.025;
-    const gemini     = 0.82;   // 7 Pro + 3 Flash
-    return (rainforest + claude + gemini);
-  }, [marianoResult]);
+    const promptsCost = cached ? 0 : 0.028;   // Rainforest + Claude
+    const chosen = marianoResult.images
+      .map((im) => im.number)
+      .filter((n) => selectedSlides.size === 0 || selectedSlides.has(n));
+    // per-slide Gemini cost: fast = all Flash ($0.04); quality = Pro on text slides ($0.10), Flash on others ($0.04)
+    const gemini = chosen.reduce((sum, n) => {
+      if (quality === "fast") return sum + 0.04;
+      return sum + (TEXT_HEAVY.has(n) ? 0.10 : 0.04);
+    }, 0);
+    return promptsCost + gemini;
+  }, [marianoResult, selectedSlides, quality, TEXT_HEAVY]);
 
   /* ──────────────────────────────────────────────────────────────────── */
   return (
@@ -849,28 +866,107 @@ function HomePageInner() {
                 );
               })()}
 
-              {/* CTA — Genera 10 immagini */}
-              <div className="flex items-center justify-between flex-wrap gap-3 pt-4"
-                style={{ borderTop: "1px solid rgba(30,63,217,0.06)" }}>
+              {/* Quality + slide selection controls */}
+              <div className="pt-4 space-y-4" style={{ borderTop: "1px solid rgba(30,63,217,0.06)" }}>
+                {/* Quality toggle */}
                 <div>
-                  <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
-                    {validImages.length > 0 ? "Le immagini sono qui sotto" : "Pronto al rendering"}
+                  <p className="text-[10px] font-semibold tracking-wider uppercase mb-2" style={{ color: "var(--text-muted)" }}>
+                    Qualità di generazione
                   </p>
-                  <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    7 slide con testo → Nano Banana Pro · 3 slide senza testo → Flash
-                  </p>
+                  <div className="grid grid-cols-2 gap-2 max-w-md">
+                    {([
+                      { id: "quality" as const, label: "Massima qualità", desc: "Pro sulle slide con testo · testo più nitido" },
+                      { id: "fast"    as const, label: "Economica",       desc: "Tutto Flash · ~metà del costo" },
+                    ]).map((q) => {
+                      const active = quality === q.id;
+                      return (
+                        <button key={q.id} type="button" onClick={() => setQuality(q.id)}
+                          className="text-left px-3 py-2 rounded-lg transition-all"
+                          style={{
+                            background: active ? "rgba(30,63,217,0.12)" : "var(--bg-card-hover)",
+                            border: `1px solid ${active ? "rgba(30,63,217,0.4)" : "var(--border)"}`,
+                          }}>
+                          <span className="text-xs font-bold block" style={{ color: active ? "var(--brand)" : "var(--text-primary)" }}>{q.label}</span>
+                          <span className="text-[10px] leading-tight block mt-0.5" style={{ color: "var(--text-muted)" }}>{q.desc}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <button
-                  onClick={handleGenerateImages}
-                  disabled={imgGenLoading || guestBlocked}
-                  className="btn-primary whitespace-nowrap"
-                >
-                  {imgGenLoading
-                    ? <span className="flex items-center gap-2"><SpinnerIcon />Generazione…</span>
-                    : validImages.length > 0
-                      ? <span className="flex items-center gap-2"><RefreshIcon />Rigenera 10 immagini</span>
-                      : <span className="flex items-center gap-2"><SparkIcon />Genera 10 immagini</span>}
-                </button>
+
+                {/* Slide selector */}
+                <div>
+                  <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                    <p className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: "var(--text-muted)" }}>
+                      Slide da generare · {selectedSlides.size}/{marianoResult.images.length}
+                    </p>
+                    <div className="flex gap-2">
+                      <button type="button"
+                        onClick={() => setSelectedSlides(new Set(marianoResult.images.map((im) => im.number)))}
+                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md"
+                        style={{ background: "rgba(30,63,217,0.1)", color: "var(--brand)", border: "1px solid rgba(30,63,217,0.25)" }}>
+                        Seleziona tutte
+                      </button>
+                      <button type="button"
+                        onClick={() => setSelectedSlides(new Set())}
+                        className="text-[11px] font-semibold px-2.5 py-1 rounded-md"
+                        style={{ background: "var(--bg-card-hover)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
+                        Deseleziona
+                      </button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+                    {marianoResult.images.map((im) => {
+                      const on = selectedSlides.has(im.number);
+                      return (
+                        <button key={im.number} type="button"
+                          onClick={() => setSelectedSlides((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(im.number)) next.delete(im.number); else next.add(im.number);
+                            return next;
+                          })}
+                          className="text-left px-2.5 py-2 rounded-lg transition-all flex items-start gap-2"
+                          style={{
+                            background: on ? "rgba(30,63,217,0.10)" : "var(--bg-card-hover)",
+                            border: `1px solid ${on ? "rgba(30,63,217,0.4)" : "var(--border)"}`,
+                          }}>
+                          <span className="mt-0.5 w-3.5 h-3.5 rounded shrink-0 flex items-center justify-center text-[9px] font-bold"
+                            style={{ background: on ? "var(--brand)" : "transparent", border: `1px solid ${on ? "var(--brand)" : "var(--border)"}`, color: "#fff" }}>
+                            {on ? "✓" : ""}
+                          </span>
+                          <span className="min-w-0">
+                            <span className="text-[10px] font-mono font-bold block" style={{ color: "var(--brand)" }}>{im.number}</span>
+                            <span className="text-[11px] leading-tight block" style={{ color: "var(--text-primary)" }}>{im.name}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* CTA */}
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: "var(--text-primary)" }}>
+                      {validImages.length > 0 ? "Le immagini sono qui sotto" : "Pronto al rendering"}
+                    </p>
+                    <p className="text-xs mt-0.5" style={{ color: "var(--text-muted)" }}>
+                      {selectedSlides.size} slide · {quality === "fast" ? "Flash (economica)" : "Pro/Flash (qualità)"}
+                      {costEstimate !== null && <> · ≈ ${costEstimate.toFixed(2)}</>}
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleGenerateImages}
+                    disabled={imgGenLoading || guestBlocked || selectedSlides.size === 0}
+                    className="btn-primary whitespace-nowrap"
+                  >
+                    {imgGenLoading
+                      ? <span className="flex items-center gap-2"><SpinnerIcon />Generazione…</span>
+                      : validImages.length > 0
+                        ? <span className="flex items-center gap-2"><RefreshIcon />Rigenera ({selectedSlides.size})</span>
+                        : <span className="flex items-center gap-2"><SparkIcon />Genera {selectedSlides.size} immagini</span>}
+                  </button>
+                </div>
               </div>
 
               {imgGenError && (
