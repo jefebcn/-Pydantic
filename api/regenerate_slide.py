@@ -29,7 +29,7 @@ async def _download_bytes(url: str, session: aiohttp.ClientSession) -> bytes | N
     return None
 
 
-async def _run(asin: str, prompts_json: dict, slide_number: str, composite: bool = False) -> dict:
+async def _run(asin: str, prompts_json: dict, slide_number: str) -> dict:
     img_data = next(
         (im for im in prompts_json.get("images", []) if im.get("number") == slide_number),
         None,
@@ -37,35 +37,20 @@ async def _run(asin: str, prompts_json: dict, slide_number: str, composite: bool
     if not img_data:
         raise ValueError(f"slide_number {slide_number} non trovato nel prompts_json")
 
-    if composite:
-        img_data = dict(img_data)
-        if str(slide_number) == "01a":
-            img_data["prompt"] += (
-                "\n\nCOMPOSITE MODE — OVERRIDE: ignore any product instruction above. "
-                "Output a PURE WHITE background (RGB 255,255,255), completely EMPTY. No product."
-            )
-        else:
-            img_data["prompt"] += (
-                "\n\nCOMPOSITE MODE — CRITICAL OVERRIDE: do NOT draw the product/bottle. "
-                "Render only background, podium, glow, props and text; leave the product spot "
-                "(podium top, centred) COMPLETELY EMPTY for compositing."
-            )
-
     amazon_data = await scrape_asin(asin)
     image_urls = amazon_data.get("images", [])[:3]
 
     ref_bytes_list: list[bytes] = []
     ref_pils: list = []
-    if not composite:
-        async with aiohttp.ClientSession() as session:
-            results = await asyncio.gather(*[_download_bytes(u, session) for u in image_urls])
-        for data in results:
-            if data:
-                ref_bytes_list.append(data)
-                try:
-                    ref_pils.append(Image.open(io.BytesIO(data)).convert("RGB"))
-                except Exception:
-                    pass
+    async with aiohttp.ClientSession() as session:
+        results = await asyncio.gather(*[_download_bytes(u, session) for u in image_urls])
+    for data in results:
+        if data:
+            ref_bytes_list.append(data)
+            try:
+                ref_pils.append(Image.open(io.BytesIO(data)).convert("RGB"))
+            except Exception:
+                pass
 
     result = await generate_one(img_data, ref_pils, ref_bytes_list)
     return {"image": result}
@@ -78,7 +63,6 @@ class handler(BaseHTTPRequestHandler):
         asin = body.get("asin", "").strip().upper()
         prompts_json = body.get("prompts_json")
         slide_number = str(body.get("slide_number", "")).strip()
-        composite = bool(body.get("composite", False))
 
         if not asin or len(asin) != 10:
             self._json(400, {"error": "ASIN non valido"})
@@ -91,7 +75,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            result = asyncio.run(_run(asin, prompts_json, slide_number, composite))
+            result = asyncio.run(_run(asin, prompts_json, slide_number))
             self._json(200, result)
         except Exception as e:
             self._json(500, {"error": str(e)})
