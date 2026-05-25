@@ -379,7 +379,9 @@ _TEXT_QUALITY_RULE = (
     "- If a string is long, reduce its font size so it fits on its line/box "
     "without colliding with neighbours — prefer smaller text over overlap.\n"
     "- One single modern bold sans-serif family for all text. High contrast "
-    "against its background so it is always readable.\n\n"
+    "against its background so it is always readable.\n"
+    "- TEXT MUST BE LARGE and easily legible on a smartphone screen: use big, "
+    "bold type. Never tiny/small text. When in doubt, make it BIGGER.\n\n"
 )
 
 
@@ -740,6 +742,114 @@ def _build_prompts(a: dict, global_rule: str, accent: str, bg: list, style: str 
     return images
 
 
+# ── PRESTIGE account preset (5 slides: MAIN + 4) ───────────────────────────────
+def _build_prestige_prompts(a: dict, global_rule: str, accent: str, bg: list) -> list:
+    """Build the 5-image set in the PRESTIGE supplement-brand style:
+    light tinted backgrounds, product on a glowing circular podium with sparkles
+    + themed fruit/gummy props, lifestyle model, bold colored uppercase headlines,
+    rounded white pill cards, leaf mark, and a 'PRESTIGE' serif wordmark.
+    The accent colour follows the product packaging (passed in `accent`)."""
+    name = a["product_name_full"]
+
+    def head(num: str, logo: bool = False) -> str:
+        return _global_header(global_rule, _logo_line(logo, num)) + _TEXT_QUALITY_RULE
+
+    prestige_base = (
+        f"PRESTIGE BRAND STYLE (supplement gummies):\n"
+        f"- Background: very light, clean, a soft gradient from white to a pale tint of {accent}; "
+        f"airy and premium. Faint sparkle/glow bokeh.\n"
+        f"- Product: place the {name} on a glossy circular PODIUM in {accent}, with a soft glowing "
+        f"halo ring of light behind it and gentle sparkles. Pixel-perfect from the reference.\n"
+        f"- Props around the base: fruit slices and soft jelly gummies matching the product's "
+        f"flavour/theme, a few green leaves/mint — tasteful, not cluttered.\n"
+        f"- Small leaf/sprout brand mark in {accent} where appropriate.\n"
+        f"- Headlines: LARGE bold uppercase, mixing {accent} and near-black words for emphasis; "
+        f"one short italic accent line allowed.\n"
+        f"- Icons: thin-line icons inside {accent} circular outlines. Info cards: rounded WHITE "
+        f"pills with a colored circular icon, a check, and big readable text.\n"
+        f"- A bottom band in {accent} with a row of small white icon+label items.\n\n"
+    )
+
+    benefits = a.get("benefits_5", []) or []
+    bottom4 = (a.get("usage_scenarios") or [])[:4]
+    specs = (a.get("specs_group_1") or [])[:5]
+
+    images = []
+
+    # 01a — MAIN (white background hero) — same as Generale MAIN
+    p_main = head("01a") + (
+        f"IMAGE MAIN — HERO SFONDO BIANCO:\n"
+        f"Extract the {name} as a pixel-perfect cutout, centered, ~65% canvas height, slight "
+        f"15° tilt. Pure white background RGB(255,255,255). Zero text, zero logo, zero effects. "
+        f"Clean commercial Amazon main image."
+    )
+    images.append({"number": "01a", "name": "Hero Sfondo Bianco", "prompt": p_main, "logo_variant": None})
+
+    # 02 — Benefit + Lifestyle
+    bl = "\n".join(f"  • {b}" for b in benefits[:4]) or "  • Benefici principali del prodotto"
+    p02 = head("02") + prestige_base + (
+        f"IMAGE — BENEFIT & LIFESTYLE:\n"
+        f"TOP: large bold uppercase headline = the product's main claim (from: "
+        f"\"{a.get('benefit_headline','')}\" / the bullets), with key words in {accent}.\n"
+        f"LEFT column: 3-4 benefits, each = a {accent} circular outline icon + a short LARGE label:\n"
+        f"{bl}\n"
+        f"CENTER: product on the glowing podium with themed props.\n"
+        f"RIGHT: a real lifestyle person (no visible face brand), scene matching the product's "
+        f"purpose (e.g. wellness/sport/beach/cozy), warm natural light, bokeh.\n"
+        f"BOTTOM {accent} band: 3-4 white icon+label items (key benefits).\n"
+    )
+    images.append({"number": "02", "name": "Benefit & Lifestyle", "prompt": p02, "logo_variant": None})
+
+    # 03 — Ingredienti & Valori
+    sc = "\n".join(f"  • {s.get('label','')}: {s.get('value','')}" for s in specs) or "  • Ingredienti principali con valori"
+    p03 = head("03") + prestige_base + (
+        f"IMAGE — INGREDIENTI & VALORI:\n"
+        f"TOP: bold uppercase headline (natural-support claim from the description), key words in {accent}.\n"
+        f"LEFT: a vertical stack of rounded WHITE pill cards (one per ingredient): each card has a "
+        f"{accent} circular icon + a green check + the ingredient name in LARGE bold + its amount, "
+        f"and a small ({accent}) %VNR pill when present:\n"
+        f"{sc}\n"
+        f"RIGHT: product on the glowing podium with themed props.\n"
+        f"BOTTOM {accent} band: row of white icon+label items.\n"
+    )
+    images.append({"number": "03", "name": "Ingredienti & Valori", "prompt": p03, "logo_variant": None})
+
+    # 04 — Doppio Assorbimento (brand-constant mechanism)
+    p04 = head("04") + prestige_base + (
+        f"IMAGE — DOPPIO ASSORBIMENTO:\n"
+        f"TOP: huge bold headline \"DOPPIO ASSORBIMENTO\" (ASSORBIMENTO in {accent}), with a rounded "
+        f"{accent} badge \"INNOVAZIONE NUTRACEUTICA\" below, then a short 2-line paragraph: "
+        f"\"Le nostre formule sfruttano un doppio assorbimento: una parte dei nutrienti viene "
+        f"assorbita rapidamente a livello sublinguale, il resto viene rilasciato gradualmente "
+        f"nell'intestino.\"\n"
+        f"CENTER: product on podium with two big curved {accent} arrows.\n"
+        f"LEFT panel: lips + lightning icon, \"ASSORBIMENTO RAPIDO\", pill \"SUBLINGUALE\", "
+        f"caption \"Attivo già durante la masticazione\".\n"
+        f"RIGHT panel: intestine + shield icon, \"RILASCIO PROLUNGATO\", pill \"INTESTINALE\", "
+        f"caption \"Nutrienti rilasciati nel tempo\".\n"
+        f"BOTTOM: tiny centered tagline \"Doppia azione, benessere completo\".\n"
+    )
+    images.append({"number": "04", "name": "Doppio Assorbimento", "prompt": p04, "logo_variant": None})
+
+    # 05 — Brand PRESTIGE (brand-constant closing)
+    p05 = head("05") + prestige_base + (
+        f"IMAGE — BRAND PRESTIGE:\n"
+        f"TOP-LEFT: the wordmark \"PRESTIGE\" in a large elegant SERIF typeface (the brand has no "
+        f"separate logo file), with a small leaf/sprout mark in {accent} above it. Under it a bold "
+        f"line \"Dedica una cura speciale al tuo benessere quotidiano\" (key words in {accent}) and "
+        f"a short reassuring paragraph about the Prestige range.\n"
+        f"BELOW: a row of 4 {accent} circular icons with labels: \"INGREDIENTI DI QUALITÀ\", "
+        f"\"FORMULAZIONI AVANZATE\", \"SICUREZZA E AFFIDABILITÀ\", \"BENESSERE OGNI GIORNO\".\n"
+        f"RIGHT: lifestyle person + the product on the podium with themed props.\n"
+        f"BOTTOM: a {accent} wave band with \"Il tuo benessere, LA NOSTRA PRIORITÀ\", a small pill "
+        f"\"SCELTA CONSAPEVOLE, RISULTATI VISIBILI\", and 3 white trust items (prodotti certificati, "
+        f"ricerca e innovazione, per tutta la famiglia).\n"
+    )
+    images.append({"number": "05", "name": "Brand Prestige", "prompt": p05, "logo_variant": None})
+
+    return images
+
+
 STYLE_DIRECTIVES = {
     "bold":      "STYLE: bold, high-contrast, saturated, punchy commercial look.",
     "minimal":   "STYLE: minimal, lots of negative space, muted/clean, refined and airy.",
@@ -752,6 +862,7 @@ async def generate_mariano_prompts(
     amazon_data: dict,
     images_b64: list[dict],
     style: str = "bold",
+    account: str = "generale",
 ) -> dict:
     """
     Main entry point. Takes Amazon product data + reference images.
@@ -814,7 +925,10 @@ async def generate_mariano_prompts(
     product_name = a.get("product_name_full", amazon_data.get("title", "Prodotto"))
     global_rule = _build_global_rule(product_name, accent)
 
-    images = _build_prompts(a, global_rule, accent, bg, style)
+    if account == "prestige":
+        images = _build_prestige_prompts(a, global_rule, accent, bg)
+    else:
+        images = _build_prompts(a, global_rule, accent, bg, style)
 
     # Bullet points reali del listing Amazon (NON inventati): vengono presi
     # tal quali da Rainforest. Garantiamo SEMPRE almeno 5 elementi: se Amazon
@@ -837,6 +951,7 @@ async def generate_mariano_prompts(
         "product_visual_description": a.get("product_visual_description", ""),
         "categoria_effetto_01b":     a.get("categoria_effetto_01b", "energy burst neutro"),
         "style":                     style,
+        "account":                   account,
         "accent_color_hex":          accent,
         "palette_sfondo_hex":        bg,
         "global_rule":               global_rule,
@@ -872,6 +987,9 @@ def restyle(prompts_json: dict, style: str) -> dict:
     data is style-independent so it's preserved. No-op if `_analysis` missing
     or style unchanged."""
     if not isinstance(prompts_json, dict):
+        return prompts_json
+    # Prestige set is style-independent (its style is fixed by the account).
+    if prompts_json.get("account") == "prestige":
         return prompts_json
     if prompts_json.get("style") == style:
         return prompts_json

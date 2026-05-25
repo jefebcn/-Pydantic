@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/auth-context";
 import AuthModal from "@/components/AuthModal";
 import { LOGO_ICON_SRC } from "@/lib/brand";
 import { APP_VERSION_LABEL } from "@/lib/version";
+import { ACCOUNTS, DEFAULT_ACCOUNT, getAccount, setAccount, accountPreset, ACCOUNT_EVENT } from "@/lib/accounts";
 
 const navItems = [
   {
@@ -29,6 +30,9 @@ export default function Sidebar() {
   const [authOpen, setAuthOpen]   = useState(false);
   const [authTab, setAuthTab]     = useState<"login" | "register">("login");
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [account, setAccountState] = useState<string>(DEFAULT_ACCOUNT);
+  useEffect(() => { setAccountState(getAccount()); }, []);
+  const onAccountChange = (id: string) => { setAccount(id); setAccountState(id); };
 
   const openLogin    = () => { setAuthTab("login");    setAuthOpen(true); };
   const openRegister = () => { setAuthTab("register"); setAuthOpen(true); };
@@ -108,6 +112,33 @@ export default function Sidebar() {
             Amazon Infographics
           </p>
         </div>
+      </div>
+
+      {/* Account / preset selector */}
+      <div className="px-4 pt-4">
+        <p className="text-[10px] font-semibold tracking-widest px-1 mb-1.5" style={{ color: "var(--text-muted)" }}>
+          ACCOUNT
+        </p>
+        <div className="relative">
+          <select
+            value={account}
+            onChange={(e) => onAccountChange(e.target.value)}
+            className="w-full appearance-none text-sm font-semibold rounded-lg pl-3 pr-8 py-2.5 cursor-pointer outline-none transition-all"
+            style={{
+              background: "rgba(30,63,217,0.06)",
+              border: "1px solid rgba(30,63,217,0.25)",
+              color: "var(--brand)",
+            }}
+          >
+            {ACCOUNTS.map((a) => (
+              <option key={a.id} value={a.id}>{a.label}</option>
+            ))}
+          </select>
+          <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs" style={{ color: "var(--brand)" }}>▾</span>
+        </div>
+        <p className="text-[10px] mt-1.5 px-1" style={{ color: "var(--text-muted)" }}>
+          {accountPreset(account).desc}
+        </p>
       </div>
 
       {/* Nav */}

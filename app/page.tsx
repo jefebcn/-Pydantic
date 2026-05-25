@@ -13,6 +13,7 @@ import type { Overlay, OverlayEdits } from "@/lib/slideLayouts";
 import { compositeSlideToBlob } from "@/lib/renderSlide";
 import { STYLE_PRESETS, DEFAULT_STYLE, stylePreset, type StyleId } from "@/lib/styles";
 import { amazonNames } from "@/lib/amazonNames";
+import { getAccount, accountPreset, ACCOUNT_EVENT, DEFAULT_ACCOUNT } from "@/lib/accounts";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -112,6 +113,15 @@ function HomePageInner() {
   const [style, setStyle]                         = useState<StyleId>(DEFAULT_STYLE);
   const [quality, setQuality]                     = useState<"quality" | "fast">("quality");
   const [selectedSlides, setSelectedSlides]       = useState<Set<string>>(new Set());
+  const [account, setAccount]                     = useState<string>(DEFAULT_ACCOUNT);
+
+  /* Read the account chosen in the sidebar (localStorage) + react to changes. */
+  useEffect(() => {
+    setAccount(getAccount());
+    const onChange = (e: Event) => setAccount((e as CustomEvent<string>).detail ?? getAccount());
+    document.addEventListener(ACCOUNT_EVENT, onChange);
+    return () => document.removeEventListener(ACCOUNT_EVENT, onChange);
+  }, []);
 
   /* ── Free-tier guest gate ─────────────────────────────────────────────── */
   const [guestRuns, setGuestRuns] = useState(0);
@@ -237,7 +247,7 @@ function HomePageInner() {
       const res = await fetch("/api/generate-mariano", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asin, force_refresh: forceRefresh, style }),
+        body: JSON.stringify({ asin, force_refresh: forceRefresh, style, account }),
       });
       const data = await res.json();
       if (!res.ok) { setMarianoError(data.error || `HTTP ${res.status}`); return; }
@@ -606,7 +616,19 @@ function HomePageInner() {
             </div>
           )}
 
-          {/* Style preset selector */}
+          {/* Active account indicator */}
+          <div className="mt-4 flex items-center gap-2 text-xs">
+            <span className="font-semibold" style={{ color: "var(--text-muted)" }}>Account:</span>
+            <span className="font-bold px-2 py-0.5 rounded-full"
+              style={{ background: "rgba(30,63,217,0.10)", color: "var(--brand)", border: "1px solid rgba(30,63,217,0.25)" }}>
+              {accountPreset(account).label} · {accountPreset(account).slides} slide
+            </span>
+            <span style={{ color: "var(--text-muted)" }}>(cambia dal menu a sinistra)</span>
+          </div>
+
+          {/* Style preset selector — only for the generic "Generale" account
+             (Prestige defines its own fixed style). */}
+          {account === "generale" && (
           <div className="mt-4">
             <p className="text-[10px] font-semibold tracking-wider uppercase mb-2" style={{ color: "var(--text-muted)" }}>
               Stile infografico
@@ -633,6 +655,7 @@ function HomePageInner() {
               })}
             </div>
           </div>
+          )}
 
           <div className="mt-5 pt-4 flex flex-wrap gap-x-5 gap-y-2"
             style={{ borderTop: "1px solid rgba(30,63,217,0.06)" }}>
