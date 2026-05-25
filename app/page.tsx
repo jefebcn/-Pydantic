@@ -14,6 +14,7 @@ import { compositeSlideToBlob } from "@/lib/renderSlide";
 import { STYLE_PRESETS, DEFAULT_STYLE, stylePreset, type StyleId } from "@/lib/styles";
 import { amazonNames } from "@/lib/amazonNames";
 import { getAccount, accountPreset, ACCOUNT_EVENT, DEFAULT_ACCOUNT } from "@/lib/accounts";
+import { compositeCutout, loadImage } from "@/lib/prestigeComposite";
 
 /* ────────────────────────────────────────────────────────────────────────────
  *  Types
@@ -114,6 +115,8 @@ function HomePageInner() {
   const [quality, setQuality]                     = useState<"quality" | "fast">("quality");
   const [selectedSlides, setSelectedSlides]       = useState<Set<string>>(new Set());
   const [account, setAccount]                     = useState<string>(DEFAULT_ACCOUNT);
+  const [cutoutImg, setCutoutImg]                 = useState<HTMLImageElement | null>(null);
+  const [cutoutUrl, setCutoutUrl]                 = useState<string | null>(null);
 
   /* Read the account chosen in the sidebar (localStorage) + react to changes. */
   useEffect(() => {
@@ -279,16 +282,28 @@ function HomePageInner() {
       const slideNums = marianoResult.images
         .map((im) => im.number)
         .filter((n) => selectedSlides.size === 0 || selectedSlides.has(n));
+      const useComposite = account === "prestige" && !!cutoutImg;
       const res = await fetch("/api/generate-mariano-images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           asin, prompts_json: cleanJson, user_id: user?.id ?? null,
-          quality, slide_numbers: slideNums,
+          quality, slide_numbers: slideNums, composite: useComposite,
         }),
       });
       const data = await res.json();
       if (!res.ok) { setImgGenError(data.error || `HTTP ${res.status}`); return; }
+      /* Composite mode: paste the real product cutout onto each generated
+         (product-free) plate at the fixed per-slide position. */
+      if (useComposite && cutoutImg) {
+        for (const im of (data.images ?? [])) {
+          if (!im.image_b64) continue;
+          try {
+            im.image_b64 = await compositeCutout(im.image_b64, im.mime, cutoutImg, im.number);
+            im.mime = "image/png";
+          } catch (e) { console.warn("[composite] slide", im.number, e); }
+        }
+      }
       /* Merge the typed text overlay (from the prompts_json) into each
          generated image by slide number, so the frontend can render the
          editable text layer on top of the clean background plate. */
@@ -359,22 +374,41 @@ function HomePageInner() {
     setRegenNumber(number);
     try {
       const { _analysis: _, ...cleanJson } = marianoResult as MarianoResult & { _analysis?: unknown };
+      const useComposite = account === "prestige" && !!cutoutImg;
       const res = await fetch("/api/regenerate-slide", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ asin, prompts_json: cleanJson, slide_number: number, user_id: user?.id ?? null }),
+        body: JSON.stringify({ asin, prompts_json: cleanJson, slide_number: number, user_id: user?.id ?? null, composite: useComposite }),
       });
       const data = await res.json();
       if (!res.ok || !data.image) { setImgGenError(data.error || `HTTP ${res.status}`); return; }
       const overlay = marianoResult.images.find((im) => im.number === number)?.overlay ?? null;
+      let b64 = data.image.image_b64;
+      if (useComposite && cutoutImg && b64) {
+        try { b64 = await compositeCutout(b64, data.image.mime, cutoutImg, number); } catch (e) { console.warn("[composite] regen", e); }
+      }
       updateImage(number, {
-        image_b64: data.image.image_b64, mime: data.image.mime, model: data.image.model,
+        image_b64: b64, mime: "image/png", model: data.image.model,
         error: data.image.error, overlay,
       });
     } catch (err) {
       setImgGenError(err instanceof Error ? err.message : "Errore di rete");
     } finally {
       setRegenNumber(null);
+    }
+  };
+
+  /* Upload the transparent product cutout (PNG) for composite mode. */
+  const onCutoutFile = async (file: File | null | undefined) => {
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await loadImage(url);
+      setCutoutImg(img);
+      setCutoutUrl(url);
+    } catch {
+      setImgGenError("PNG non valido");
+      URL.revokeObjectURL(url);
     }
   };
 
@@ -892,6 +926,41 @@ function HomePageInner() {
 
               {/* Quality + slide selection controls */}
               <div className="pt-4 space-y-4" style={{ borderTop: "1px solid rgba(30,63,217,0.06)" }}>
+
+                {/* Prestige: real product cutout (PNG) for compositing */}
+                {account === "prestige" && (
+                  <div className="rounded-xl p-4" style={{ background: "var(--bg-card-hover)", border: "1px solid var(--border)" }}>
+                    <p className="text-[10px] font-semibold tracking-wider uppercase mb-2" style={{ color: "var(--brand)" }}>
+                      Prodotto scontornato (PNG trasparente)
+                    </p>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {cutoutUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={cutoutUrl} alt="cutout" className="w-14 h-14 object-contain rounded-lg"
+                          style={{ border: "1px solid var(--border)", background: "repeating-conic-gradient(#eee 0% 25%, #fff 0% 50%) 50% / 12px 12px" }} />
+                      )}
+                      <label className="text-xs font-semibold px-3 py-2 rounded-lg cursor-pointer"
+                        style={{ background: "rgba(30,63,217,0.12)", color: "var(--brand)", border: "1px solid rgba(30,63,217,0.3)" }}>
+                        {cutoutImg ? "Cambia PNG" : "Carica PNG"}
+                        <input type="file" accept="image/png" className="hidden"
+                          onChange={(e) => onCutoutFile(e.target.files?.[0])} />
+                      </label>
+                      {cutoutImg && (
+                        <button type="button"
+                          onClick={() => { if (cutoutUrl) URL.revokeObjectURL(cutoutUrl); setCutoutImg(null); setCutoutUrl(null); }}
+                          className="text-xs px-3 py-2 rounded-lg" style={{ background: "var(--bg-card)", color: "var(--text-muted)", border: "1px solid var(--border)" }}>
+                          Rimuovi
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-[11px] leading-relaxed mt-2" style={{ color: "var(--text-muted)" }}>
+                      {cutoutImg
+                        ? "✓ Il prodotto reale verrà incollato sulle slide (confezione identica). Gli sfondi vengono generati senza boccetta."
+                        : "Opzionale: carica il prodotto scontornato e il sito lo incolla al posto giusto su ogni slide — confezione identica al 100%. Senza, la boccetta viene generata dall'AI."}
+                    </p>
+                  </div>
+                )}
+
                 {/* Quality toggle */}
                 <div>
                   <p className="text-[10px] font-semibold tracking-wider uppercase mb-2" style={{ color: "var(--text-muted)" }}>

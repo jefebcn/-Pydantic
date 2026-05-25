@@ -32,8 +32,31 @@ async def _download_bytes(url: str, session: aiohttp.ClientSession) -> bytes | N
 
 
 async def _run(asin: str, prompts_json: dict, cache_hit: bool, user_id: str | None = None,
-               quality: str = "quality", slide_numbers: list | None = None) -> dict:
+               quality: str = "quality", slide_numbers: list | None = None,
+               composite: bool = False) -> dict:
     t0 = time.time()
+
+    # Composite mode: the real product cutout is pasted client-side afterward,
+    # so the model must NOT draw the product — it produces clean background
+    # plates with the product area left empty.
+    if composite:
+        import copy
+        prompts_json = copy.deepcopy(prompts_json)
+        for im in prompts_json.get("images", []):
+            num = str(im.get("number"))
+            if num == "01a":
+                im["prompt"] += (
+                    "\n\nCOMPOSITE MODE — OVERRIDE: ignore any product instruction above. "
+                    "Output a PURE WHITE background (RGB 255,255,255), completely EMPTY. "
+                    "Do NOT draw the product or anything else. Just clean white."
+                )
+            else:
+                im["prompt"] += (
+                    "\n\nCOMPOSITE MODE — CRITICAL OVERRIDE: do NOT draw the product/bottle at all. "
+                    "Render only the background, podium, glow, props and text. Leave the product "
+                    "spot (the podium top, centred) COMPLETELY EMPTY/CLEAR — the real product photo "
+                    "is composited there afterward. No bottle, no jar, no placeholder shape."
+                )
 
     # Download up to 3 reference images from Amazon
     amazon_data = await scrape_asin(asin)
@@ -54,9 +77,14 @@ async def _run(asin: str, prompts_json: dict, cache_hit: bool, user_id: str | No
             except Exception:
                 pass
 
+    # In composite mode the product isn't drawn, so reference photos would only
+    # confuse the background — skip them.
+    gen_refs_pils = [] if composite else ref_pils
+    gen_refs_bytes = [] if composite else ref_bytes_list
+
     # Generate the requested slides (parallel=5). quality "fast" forces Flash.
     images = await generate_all(
-        prompts_json, ref_pils, ref_bytes_list,
+        prompts_json, gen_refs_pils, gen_refs_bytes,
         parallel=5, quality=quality, slide_numbers=slide_numbers,
     )
 
@@ -93,6 +121,7 @@ class handler(BaseHTTPRequestHandler):
         slide_numbers = body.get("slide_numbers") or None
         if slide_numbers is not None and not isinstance(slide_numbers, list):
             slide_numbers = None
+        composite = bool(body.get("composite", False))
 
         if not asin or len(asin) != 10:
             self._json(400, {"error": "ASIN non valido"})
@@ -102,7 +131,7 @@ class handler(BaseHTTPRequestHandler):
             return
 
         try:
-            result = asyncio.run(_run(asin, prompts_json, cache_hit, user_id, quality, slide_numbers))
+            result = asyncio.run(_run(asin, prompts_json, cache_hit, user_id, quality, slide_numbers, composite))
             self._json(200, result)
         except Exception as e:
             self._json(500, {"error": str(e)})
