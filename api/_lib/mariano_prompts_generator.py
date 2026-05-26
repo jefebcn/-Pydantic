@@ -906,7 +906,12 @@ _LAMONEA_PRODUCT_LOCK = (
     "surface clean rather than garbled.\n"
     "- Show the product in sharp focus, the same model in every slide, never a variant. Graphic "
     "callouts/icons/text must NEVER touch or overlap the product. Scale the product large enough "
-    "that its details stay crisp. A product that differs from the reference is a FAILURE.\n\n"
+    "that its details stay crisp. A product that differs from the reference is a FAILURE.\n"
+    "- FRONT FACE PREFERENCE: show the product's FRONT / branded face as the hero so its main "
+    "label (logo, product name, key printing) reads clearly. AVOID showing dense back-of-pack "
+    "legal micro-text. If any tiny print is unavoidable, render it as a soft, realistic, "
+    "out-of-focus texture — NEVER invent, garble, duplicate or fake small lettering. It is far "
+    "better to show a clean front than a back covered in illegible gibberish text.\n\n"
 )
 
 
@@ -966,8 +971,13 @@ def _build_lamonea_prompts(a: dict, global_rule: str, accent: str, bg: list) -> 
         f"TOP: large bold UPPERCASE headline in {navy} = \"{headline}\"" +
         (f"; directly below, a secondary line in {blue} UPPERCASE with ' • ' separators: "
          f"\"{subline}\".\n" if subline else ".\n") +
-        f"CENTER: the {name} large on a subtle reflective light surface, soft clinical defocused "
-        f"background.\n"
+        f"CENTER: the {name} as a SINGLE clean HERO, shown strictly FRONT-FACING so its branded "
+        f"front label is fully visible and centred, large (~50-55% canvas height) and razor-sharp, "
+        f"standing on a subtle reflective light surface with a soft clinical defocused background. "
+        f"Reproduce the FRONT label EXACTLY as in the reference photo — the logo, the product name, "
+        f"every printed word and number, the colours and the coloured band — pixel-faithful. "
+        f"Show ONLY the FRONT of the pack: do NOT show the back side or its dense legal micro-text, "
+        f"and do NOT duplicate the pack. One product, front face, faithful.\n"
         f"BOTTOM: a row of 2 callouts, each = a thin {navy} line-art icon + a short UPPERCASE "
         f"{navy} label, separated by a thin vertical divider line: {cl02}.\n"
     )

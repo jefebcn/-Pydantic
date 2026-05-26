@@ -144,6 +144,10 @@ function HomePageInner() {
   const step2Ref = useRef<HTMLElement | null>(null);
   const step3Ref = useRef<HTMLElement | null>(null);
   const asinInputRef = useRef<HTMLInputElement | null>(null);
+  /* Key (asin:account) the current generatedImages belong to. Lets us refresh
+     prompts for the SAME product without wiping already-generated slides — so a
+     user can pick up an improved prompt and regenerate ONLY the bad slide. */
+  const generatedKeyRef = useRef<string | null>(null);
 
   const validImages = generatedImages.filter(i => i.image_b64);
 
@@ -240,7 +244,11 @@ function HomePageInner() {
     setMarianoLoading(true);
     setMarianoError(null);
     setMarianoResult(null);
-    setGeneratedImages([]);
+    // Keep already-generated slides when re-running prompts for the SAME
+    // product (asin+account) — e.g. to pick up an improved prompt and then
+    // regenerate only the wrong slide. Clear them only when the product changes.
+    const sameProduct = generatedKeyRef.current === `${asin}:${account}`;
+    if (!sameProduct) setGeneratedImages([]);
     setExpandedImg(null);
 
     try {
@@ -305,6 +313,7 @@ function HomePageInner() {
         };
       });
       setGeneratedImages(imgs);
+      generatedKeyRef.current = `${asin}:${account}`;
       if (imgs.some((im) => im.image_b64)) consumeGuestRun();   // free run used
 
       /* Persist the run to IndexedDB so /run/[asin] and the history page
