@@ -886,6 +886,176 @@ def _build_prestige_prompts(a: dict, global_rule: str, accent: str, bg: list) ->
     return images
 
 
+# ── LAMONEA account preset (medical devices — MAIN + 6 selectable infographics) ─
+# Fixed clinical brand look: navy text/icons on white / very light blue clinical
+# backgrounds, thin line-art icons, real product reproduced faithfully.
+LAMONEA_NAVY = "#16365A"   # headlines, labels, icons
+LAMONEA_BLUE = "#2E6CB5"   # secondary subtitle / diagram line
+
+_LAMONEA_PRODUCT_LOCK = (
+    "PRODUCT FIDELITY — ABSOLUTE PRIORITY (medical device, the #1 success criterion):\n"
+    "The reference photo is the ONLY source of truth for the product. Reproduce it like a "
+    "high-resolution photographic cutout — NEVER redrawn, simplified, smoothed or re-modelled:\n"
+    "- Keep the EXACT 3D geometry, proportions and every component (each connector, cap, ring, "
+    "thread, tube, handle, valve, the transparent body and its internal structure).\n"
+    "- Keep the EXACT materials and optics: clear medical transparency with its real refractions, "
+    "highlights and subtle internal reflections; the same plastic colours (e.g. blue handle, grey "
+    "luer caps, white base).\n"
+    "- Reproduce EXACTLY any text, number or symbol moulded/printed on the product (size codes, "
+    "marks). Never invent, translate or restyle them; if too small to render cleanly, leave the "
+    "surface clean rather than garbled.\n"
+    "- Show the product in sharp focus, the same model in every slide, never a variant. Graphic "
+    "callouts/icons/text must NEVER touch or overlap the product. Scale the product large enough "
+    "that its details stay crisp. A product that differs from the reference is a FAILURE.\n\n"
+)
+
+
+def _build_lamonea_prompts(a: dict, global_rule: str, accent: str, bg: list) -> list:
+    """Build the LAMONEA medical set: clean clinical navy-on-light-blue look,
+    thin line-art icons, faithful transparent product, optional concept diagrams,
+    4-step how-to with illustrated hands, sterile-pouch packaging slide.
+    Returns MAIN + 6 selectable infographics; the user picks which to render."""
+    name = a["product_name_full"]
+    navy, blue = LAMONEA_NAVY, LAMONEA_BLUE
+
+    def head(num: str) -> str:
+        return _global_header(global_rule, _logo_line(False, num)) + _TEXT_QUALITY_RULE
+
+    base = (
+        f"LAMONEA MEDICAL BRAND STYLE (clinical, sterile, premium, very clean):\n"
+        f"- Palette: ONLY dark navy {navy} for ALL headlines, labels and icons, a medium "
+        f"clinical blue {blue} for secondary subtitles/diagram lines, on WHITE and very light "
+        f"sky-blue backgrounds. No other colours in the graphics (the product keeps its own).\n"
+        f"- Background: airy and clinical — either pure white, a soft white→pale-blue gradient, "
+        f"or a softly DEFOCUSED clinical/hospital environment in white-blue tones. Lots of white "
+        f"space. The product sits on a subtle glossy light surface with a soft mirror reflection.\n"
+        f"- Typography: bold UPPERCASE geometric sans-serif headline at the TOP in {navy}; an "
+        f"optional secondary line in {blue} using ' • ' separators. Clean, generous spacing.\n"
+        f"- Icons: THIN LINE-ART in {navy}, minimal, sometimes inside a thin {navy} circular "
+        f"outline; each icon paired with a short UPPERCASE {navy} label and an optional smaller "
+        f"secondary line (sometimes in parentheses). Callouts may be split by a thin vertical divider.\n\n"
+        + _LAMONEA_PRODUCT_LOCK
+    )
+
+    benefits = [b for b in (a.get("benefits_5") or []) if b][:4]
+    bottom_cards = a.get("specs_group_2_bottom_cards") or []
+    specs1 = a.get("specs_group_1") or []
+    steps = a.get("usage_steps") or []
+    trust = a.get("trust_badges") or []
+    headline = a.get("benefit_headline", "") or name
+    subline = a.get("benefit_pill") or a.get("benefit_subheading") or ""
+
+    images = []
+
+    # 01a — MAIN (white background hero)
+    p_main = head("01a") + _LAMONEA_PRODUCT_LOCK + (
+        f"IMAGE MAIN — HERO SFONDO BIANCO:\n"
+        f"Place the {name} as a pixel-perfect cutout, centered, ~60-65% canvas height, a slight "
+        f"natural 3/4 angle, in razor-sharp focus with a soft realistic reflection under it. "
+        f"Pure white background RGB(255,255,255). Zero text, zero logo, zero effects. "
+        f"Clean commercial Amazon main image."
+    )
+    images.append({"number": "01a", "name": "Hero Sfondo Bianco", "prompt": p_main, "logo_variant": None})
+
+    # 02 — Hero + Titolo
+    c02 = [(t.get("title", ""), t.get("subtext", "")) for t in trust[:2]] or \
+          [(b, "") for b in benefits[:2]] or [("STERILE", ""), ("MONOUSO", "")]
+    cl02 = " | ".join(f"{lab}" + (f" ({sub})" if sub else "") for lab, sub in c02)
+    p02 = head("02") + base + (
+        f"IMAGE — HERO & TITOLO:\n"
+        f"TOP: large bold UPPERCASE headline in {navy} = \"{headline}\"" +
+        (f"; directly below, a secondary line in {blue} UPPERCASE with ' • ' separators: "
+         f"\"{subline}\".\n" if subline else ".\n") +
+        f"CENTER: the {name} large on a subtle reflective light surface, soft clinical defocused "
+        f"background.\n"
+        f"BOTTOM: a row of 2 callouts, each = a thin {navy} line-art icon + a short UPPERCASE "
+        f"{navy} label, separated by a thin vertical divider line: {cl02}.\n"
+    )
+    images.append({"number": "02", "name": "Hero & Titolo", "prompt": p02, "logo_variant": None})
+
+    # 03 — Caratteristiche / Materiale
+    feats = [(c.get("label", ""), c.get("subtext", "")) for c in bottom_cards[:4]] or \
+            [(b, "") for b in benefits[:4]] or [("LATEX-FREE", "Anallergico"), ("STERILE", "Monouso")]
+    fl = "\n".join(f"  • {lab}" + (f" — {sub}" if sub else "") for lab, sub in feats)
+    p03 = head("03") + base + (
+        f"IMAGE — CARATTERISTICHE & MATERIALE:\n"
+        f"TOP: bold UPPERCASE {navy} headline about the product's material/quality (e.g. "
+        f"\"100% SILICONE MEDICALE\" / a key material claim from the description).\n"
+        f"CENTER: the {name} as the hero on a clinical defocused background with soft reflection.\n"
+        f"AROUND the product (left and right, not touching it): 2-4 callouts, each a thin {navy} "
+        f"line-art icon + UPPERCASE {navy} label + a small secondary line (often in parentheses):\n"
+        f"{fl}\n"
+    )
+    images.append({"number": "03", "name": "Caratteristiche", "prompt": p03, "logo_variant": None})
+
+    # 04 — Misure & Specifiche (technical overlay)
+    sl = "\n".join(f"  • {s.get('label','')}: {s.get('value','')}" for s in specs1[:4]) or \
+         "  • Misure e specifiche tecniche del prodotto"
+    p04 = head("04") + base + (
+        f"IMAGE — MISURE & SPECIFICHE:\n"
+        f"TOP: bold UPPERCASE {navy} headline (e.g. \"TROVA LA TUA MISURA PERFETTA\" / "
+        f"\"{a.get('specs_group_1_headline','SPECIFICHE TECNICHE')}\").\n"
+        f"CENTER: the {name} with a precise TECHNICAL MEASUREMENT OVERLAY drawn in thin {navy} "
+        f"lines OVER (but not altering) the product: ruler tick marks and a double-headed arrow "
+        f"showing a key dimension/diameter, blueprint-grade and clean.\n"
+        f"SIDE callouts: thin {navy} line-art icons (caliper, diameter arrow) + UPPERCASE {navy} "
+        f"labels with the real values:\n{sl}\n"
+    )
+    images.append({"number": "04", "name": "Misure & Specifiche", "prompt": p04, "logo_variant": None})
+
+    # 05 — Come funziona (concept diagram)
+    p05 = head("05") + base + (
+        f"IMAGE — COME FUNZIONA:\n"
+        f"TOP: bold UPPERCASE {navy} headline naming the function/benefit (from the description, "
+        f"e.g. how the device is used), with an optional {blue} ' • ' subtitle.\n"
+        f"LEFT: the {name} on the reflective light surface.\n"
+        f"RIGHT: a clean translucent LINE-ART DIAGRAM in {blue}/{navy} that visually explains how "
+        f"the product works or connects in its clinical use (schematic, light, not photographic) — "
+        f"infer it from the product type and description.\n"
+        f"BOTTOM: a short centered {navy} caption summarising the function in 3-6 words.\n"
+    )
+    images.append({"number": "05", "name": "Come Funziona", "prompt": p05, "logo_variant": None})
+
+    # 06 — Guida d'uso 4 step (illustrated hands)
+    use_steps = steps[:4] if steps else [
+        {"step_num": 1, "title": "VERIFICA E PREPARA"}, {"step_num": 2, "title": "RIMUOVI IL SUPPORTO"},
+        {"step_num": 3, "title": "POSIZIONA"}, {"step_num": 4, "title": "CONNETTI"},
+    ]
+    stl = "\n".join(
+        f"  {s.get('step_num', i+1)}. {s.get('title','')}" + (f" — {s.get('subtext','')}" if s.get('subtext') else "")
+        for i, s in enumerate(use_steps)
+    )
+    p06 = head("06") + base + (
+        f"IMAGE — GUIDA RAPIDA ALL'USO (4 STEP):\n"
+        f"TOP: bold UPPERCASE {navy} headline \"GUIDA RAPIDA ALL'APPLICAZIONE\".\n"
+        f"A 2x2 GRID of 4 white ROUNDED CARDS with a thin {navy} border and soft shadow. Each card: "
+        f"a LARGE {navy} step number, a clean semi-realistic ILLUSTRATION (not photo) of hands "
+        f"performing the step holding a faithful depiction of THIS product, and an UPPERCASE {navy} "
+        f"caption. The illustrated product must match the real one (shape, colours, components):\n"
+        f"{stl}\n"
+        f"Keep the clinical illustration style consistent across all 4 cards.\n"
+    )
+    images.append({"number": "06", "name": "Guida d'Uso", "prompt": p06, "logo_variant": None})
+
+    # 07 — Confezione & Qualità (sterile pouches / quantity)
+    badges = [(t.get("title", ""), t.get("subtext", "")) for t in trust[:3]] or \
+             [("STERILE", "Confezione sigillata"), ("MONOUSO", "Massima igiene"), ("LATEX-FREE", "Anallergico")]
+    bl = "\n".join(f"  • {lab}" + (f" — {sub}" if sub else "") for lab, sub in badges)
+    p07 = head("07") + base + (
+        f"IMAGE — CONFEZIONE & QUALITÀ:\n"
+        f"TOP: bold UPPERCASE {navy} headline about sterility/quantity/hygiene (e.g. "
+        f"\"STERILE E SIGILLATO\" / a quantity claim).\n"
+        f"CENTER: several individually SEALED transparent STERILE POUCHES each containing the "
+        f"{name} (the device clearly visible inside the sealed pack), neatly arranged on a clean "
+        f"light clinical surface — conveying quantity and sealed hygiene.\n"
+        f"BOTTOM: a row of callouts, each a thin {navy} line-art icon inside a thin {navy} circle "
+        f"+ an UPPERCASE {navy} label + small secondary line:\n{bl}\n"
+    )
+    images.append({"number": "07", "name": "Confezione & Qualità", "prompt": p07, "logo_variant": None})
+
+    return images
+
+
 STYLE_DIRECTIVES = {
     "bold":      "STYLE: bold, high-contrast, saturated, punchy commercial look.",
     "minimal":   "STYLE: minimal, lots of negative space, muted/clean, refined and airy.",
@@ -963,6 +1133,8 @@ async def generate_mariano_prompts(
 
     if account == "prestige":
         images = _build_prestige_prompts(a, global_rule, accent, bg)
+    elif account == "lamonea":
+        images = _build_lamonea_prompts(a, global_rule, accent, bg)
     else:
         images = _build_prompts(a, global_rule, accent, bg, style)
 
@@ -1024,8 +1196,8 @@ def restyle(prompts_json: dict, style: str) -> dict:
     or style unchanged."""
     if not isinstance(prompts_json, dict):
         return prompts_json
-    # Prestige set is style-independent (its style is fixed by the account).
-    if prompts_json.get("account") == "prestige":
+    # Prestige and LAMONEA sets are style-independent (style fixed by the account).
+    if prompts_json.get("account") in ("prestige", "lamonea"):
         return prompts_json
     if prompts_json.get("style") == style:
         return prompts_json

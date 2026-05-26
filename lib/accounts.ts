@@ -18,6 +18,7 @@ export interface AccountPreset {
 export const ACCOUNTS: AccountPreset[] = [
   { id: "generale", label: "Generale", desc: "Set standard 10 slide",          slides: 10 },
   { id: "prestige", label: "Prestige", desc: "Integratori · 5 slide su misura", slides: 5  },
+  { id: "lamonea",  label: "LAMONEA",  desc: "Medicale · MAIN + 6 selezionabili", slides: 7 },
 ];
 
 export const DEFAULT_ACCOUNT = "generale";
