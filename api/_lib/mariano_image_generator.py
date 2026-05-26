@@ -66,6 +66,22 @@ def _to_square_png(data: bytes, size: int = 2000) -> bytes:
     return out.getvalue()
 
 
+def _gen_config():
+    """Build the generation config, natively forcing a 1:1 square output when the
+    installed google-genai SDK supports it (ImageConfig.aspect_ratio). Falls back
+    gracefully on older SDKs — `_to_square_png` is still the hard 1:1 guarantee."""
+    kwargs = {"response_modalities": ["IMAGE", "TEXT"]}
+    ic_cls = getattr(google_genai_types, "ImageConfig", None)
+    if ic_cls is not None:
+        try:
+            return google_genai_types.GenerateContentConfig(
+                image_config=ic_cls(aspect_ratio="1:1"), **kwargs
+            )
+        except Exception:
+            pass
+    return google_genai_types.GenerateContentConfig(**kwargs)
+
+
 async def _generate_gemini(prompt: str, ref_pils: list, slide_num: str, model_id: str) -> bytes:
     """Call Gemini (specified model) with reference images + prompt, return PNG bytes."""
     loop = asyncio.get_event_loop()
@@ -78,9 +94,7 @@ async def _generate_gemini(prompt: str, ref_pils: list, slide_num: str, model_id
         resp = client.models.generate_content(
             model=model_id,
             contents=contents,
-            config=google_genai_types.GenerateContentConfig(
-                response_modalities=["IMAGE", "TEXT"],
-            ),
+            config=_gen_config(),
         )
         for cand in (resp.candidates or []):
             content = getattr(cand, "content", None)
