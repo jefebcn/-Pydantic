@@ -1,36 +1,74 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Seconda Mano Hunter × Sander Chill House
 
-## Getting Started
+Trova le offerte **Amazon Seconda Mano** (amazon.it, da 100 € in su) con la differenza più grande rispetto al prezzo del **nuovo**. Calcola il margine applicando il vostro sconto del 22% e manda un avviso quando c'è un affare da prendere al volo.
 
-First, run the development server:
-
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+```
+PC di casa (scanner Python)  ──►  Supabase (prezzi + storico)  ──►  Dashboard Vercel
+        │                                                            (notifiche browser)
+        └──► Telegram (avviso immediato sul telefono)
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+La dashboard è un piccolo gestionale con quattro sezioni:
+- **Panoramica:** indicatori, offerte da prendere al volo, stato del magazzino, ultime vendite.
+- **Offerte:** classifica con filtri. ☆ segna un'offerta interessante, ✕ la ignora (e smette di mandare avvisi), 🛒 registra l'acquisto in magazzino.
+- **Magazzino:** pezzi comprati divisi per stato (ordinato → ricevuto → in vendita → venduto / reso), con costo, prezzo obiettivo, prezzo di vendita, profitto, ROI, giorni in giacenza ed export CSV.
+- **Impostazioni:** sconto, soglie degli avvisi, stato dello scanner, guida al setup.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Costo: **0 €**. Supabase, Vercel e Telegram si usano col piano gratuito. Lo scanner gira sul vostro PC perché Amazon blocca le richieste che arrivano dai server cloud.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Come si calcola il margine
 
-## Learn More
+| Voce | Formula |
+|---|---|
+| Tuo costo | prezzo Seconda Mano × (1 − 22%) |
+| Riferimento nuovo | media del prezzo nuovo negli ultimi 90 giorni, ma mai sopra il nuovo attuale (così un prezzo gonfiato non falsa il calcolo) |
+| Guadagno € | riferimento − tuo costo |
+| Margine % | 1 − tuo costo / riferimento |
 
-To learn more about Next.js, take a look at the following resources:
+Lo storico a 90 giorni si costruisce col tempo, salvando i prezzi a ogni controllo. Nei primi giorni il riferimento è il prezzo nuovo attuale. Si usa il prezzo venduto da Amazon e, se Amazon non vende quel prodotto, il nuovo più basso fra gli altri venditori. La soglia degli avvisi, lo sconto e il prezzo minimo si cambiano dalla dashboard, nella pagina Impostazioni.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Setup (una volta sola)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 1. Database Supabase
+1. Su [supabase.com](https://supabase.com) apri un progetto (va bene il piano gratuito).
+2. In **SQL Editor → New query** incolla **tutto** il file `supabase/schema.sql` e premi **Run**. È l'unico file SQL e contiene tutto: tabelle, viste, sicurezza. Si può rilanciare senza perdere dati.
+3. In **Project Settings → API** copia il **Project URL** e la **service_role key**.
 
-## Deploy on Vercel
+### 2. Bot Telegram
+1. Su Telegram scrivi a **@BotFather** → `/newbot` e copia il **token**.
+2. Manda un messaggio qualsiasi al tuo bot. Puoi anche aggiungerlo a un gruppo con il socio.
+3. Apri `https://api.telegram.org/bot<TOKEN>/getUpdates` nel browser e copia il numero `chat.id`.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 3. Scanner sul PC
+Requisito: Python 3.10+ ([python.org](https://www.python.org/downloads/); su Windows spunta *Add to PATH*).
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+git clone https://github.com/jefebcn/-Pydantic.git
+cd -Pydantic
+cp scraper/.env.example scraper/.env     # su Windows: copy scraper\.env.example scraper\.env
+```
+Compila `scraper/.env`, poi:
+- **Windows:** doppio click su `avvia-scanner.bat`
+- **Mac/Linux:** `./avvia-scanner.sh`
+
+Prima di lasciarlo girare fai una prova veloce, che non salva nulla:
+```bash
+.venv/bin/python -m scraper.main --search notebook      # Windows: .venv\Scripts\python -m scraper.main --search notebook
+.venv/bin/python -m scraper.main --test B0XXXXXXXX      # un ASIN che ha un'offerta Seconda Mano
+```
+Se escono prezzi sensati, lo scanner funziona. Se esce un errore di lettura, rilancia con `--debug` e mandaci i file in `scraper/debug/`.
+
+### 4. Dashboard su Vercel
+Imposta le variabili di `.env.example` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DASHBOARD_PASSWORD`) in Vercel → Settings → Environment Variables e fai il deploy. Apri la dashboard e premi **🔔 Attiva notifiche browser** (in basso a sinistra).
+
+## Ritmo e blocchi
+- Un ciclo ogni 20 minuti, con 4–9 secondi di pausa fra una pagina e l'altra. Le offerte di un prodotto vengono ricontrollate solo se il prezzo cambia o dopo 6 ore.
+- Se Amazon chiede il CAPTCHA, lo scanner si ferma 30 minuti e avvisa su Telegram. Non prova ad aggirarlo.
+- Categorie e parole chiave stanno in `scraper/config.py` (`SEARCHES`).
+
+## Sviluppo
+```bash
+npm install && npm run dev                       # dashboard (serve .env.local)
+pip install -r scraper/requirements.txt
+python -m pytest scraper/tests                   # test del parsing
+```
