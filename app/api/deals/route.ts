@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseAdmin } from "@/lib/supabase";
+import { supabaseAdmin, supabaseHost } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +26,7 @@ export async function GET() {
       scanner: { last_check: last.data?.[0]?.checked_at ?? null },
     });
   } catch (e) {
-    return NextResponse.json({ error: (e as Error).message }, { status: 500 });
+    // il nome host (non segreto) aiuta a capire se punta al progetto Supabase giusto
+    return NextResponse.json({ error: `${(e as Error).message} [db: ${supabaseHost()}]` }, { status: 500 });
   }
 }

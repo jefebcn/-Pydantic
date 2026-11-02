@@ -63,8 +63,22 @@ ALERT_MARGIN_PCT = os.getenv("ALERT_MARGIN_PCT")
 ALERT_PROFIT_EUR = os.getenv("ALERT_PROFIT_EUR")
 
 # Servizi
-SUPABASE_URL = (os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "").rstrip("/")
-SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SECRET_KEY") or ""
+def _normalize_supabase_url(raw: str) -> str:
+    """https://<ref>.supabase.co anche se incollato con /rest/v1/ o come link della dashboard."""
+    import re
+    from urllib.parse import urlparse
+    s = raw.strip().strip("'\"")
+    m = re.search(r"supabase\.com/dashboard/project/([a-z0-9]{10,})", s, re.I)
+    if m:
+        return f"https://{m.group(1)}.supabase.co"
+    if s and not re.match(r"https?://", s, re.I):
+        s = "https://" + s
+    u = urlparse(s)
+    return f"{u.scheme}://{u.netloc}" if u.netloc else s.rstrip("/")
+
+
+SUPABASE_URL = _normalize_supabase_url(os.getenv("SUPABASE_URL") or os.getenv("NEXT_PUBLIC_SUPABASE_URL") or "")
+SUPABASE_SERVICE_ROLE_KEY = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_SECRET_KEY") or "").strip()
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 DASHBOARD_URL = os.getenv("DASHBOARD_URL", "")

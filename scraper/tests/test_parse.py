@@ -75,3 +75,12 @@ def test_parse_offers_picks_cheapest_seconda_mano_and_amazon_new():
 def test_captcha_detection():
     assert is_captcha('<form action="/errors/validateCaptcha">')
     assert not is_captcha(SEARCH_HTML)
+
+
+def test_normalize_supabase_url():
+    from scraper.config import _normalize_supabase_url as n
+    assert n("https://abcdefghijklmnop.supabase.co/") == "https://abcdefghijklmnop.supabase.co"
+    assert n("https://abcdefghijklmnop.supabase.co/rest/v1/") == "https://abcdefghijklmnop.supabase.co"
+    assert n("abcdefghijklmnop.supabase.co") == "https://abcdefghijklmnop.supabase.co"
+    assert n("https://supabase.com/dashboard/project/abcdefghijklmnop/settings/api") == "https://abcdefghijklmnop.supabase.co"
+    assert n("") == ""
