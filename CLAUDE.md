@@ -1,4 +1,4 @@
-# CLAUDE.md — Seconda Mano Hunter
+# CLAUDE.md — Seconda Mano Hunter × Sander Chill House
 
 ## Missione
 Trovare su **amazon.it** le offerte **Amazon Seconda Mano** (≥ 100 €) con il margine più alto rispetto al prezzo **nuovo**. Gli utenti comprano i prodotti venduti da Amazon (Seconda Mano compreso) con il **22% di sconto** e li rivendono. Il software deve:
@@ -13,7 +13,7 @@ Trovare su **amazon.it** le offerte **Amazon Seconda Mano** (≥ 100 €) con il
 |---|---|---|
 | Scanner (Python, requests + BeautifulSoup) | **PC di casa degli utenti**: Amazon blocca gli IP cloud (503) | `scraper/` |
 | Database | Supabase free | `supabase/schema.sql` (tabelle + vista `deals_v`) |
-| Dashboard | Next.js 16 su Vercel free | `app/`, `lib/`, `proxy.ts` (Basic Auth) |
+| Dashboard (gestionale) | Next.js 16 su Vercel free | `app/` (Panoramica, `offerte/`, `magazzino/`, `impostazioni/`), `components/`, `proxy.ts` (Basic Auth) |
 | Avvisi | Telegram Bot API + Notification API del browser | `scraper/notify.py`, `app/page.tsx` |
 
 Flusso dello scanner (`scraper/main.py`):
@@ -22,8 +22,11 @@ Flusso dello scanner (`scraper/main.py`):
 3. Salva lo snapshot in `price_snapshots`.
 4. Legge `deals_v` e manda l'avviso se il prodotto supera le soglie in `settings`.
 
+Dati della dashboard: `components/DataProvider.tsx` carica `/api/deals` e `/api/inventory` ogni 60 s, gestisce le notifiche del browser e espone le azioni (triage offerte, CRUD magazzino, impostazioni). Il SQL è tutto in un solo file (`supabase/schema.sql`), idempotente.
+
 ## Regole
-- Il calcolo del margine sta **solo** nella vista SQL `deals_v`. Scanner e dashboard la leggono, non ricalcolano.
+- Il calcolo del margine sta **solo** nella vista SQL `deals_v`, il profitto del magazzino solo in `inventory_v`. Scanner e dashboard le leggono, non ricalcolano.
+- Offerte con `triage` ignorato o acquistato non generano avvisi.
 - Scraping educato: pause casuali, niente rotazione proxy, niente risoluzione CAPTCHA. Se arriva il CAPTCHA ci si ferma.
 - Il parsing HTML (`scraper/amazon.py`, funzioni `parse_*`) deve restare puro e coperto da `scraper/tests/`. Quando Amazon cambia layout, aggiungere l'HTML reale (da `--debug`) come fixture.
 - La service role key di Supabase si usa solo lato server: route handler e scanner, mai nei componenti client.

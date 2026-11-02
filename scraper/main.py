@@ -93,6 +93,8 @@ def run_cycle(client: AmazonClient, store) -> None:
             continue
         margin, profit = float(d["margin_pct"]), float(d["profit_eur"])
         log(f"  {it.asin} usato {used_price}€ | nuovo {d['ref_price']}€ | margine {margin:.0f}% (+{profit:.0f}€)")
+        if d.get("triage") in ("ignorato", "acquistato"):
+            continue
         if margin >= min_margin and profit >= min_profit and not store.already_alerted(it.asin, used_price):
             if telegram(format_deal(d, discount)):
                 alerts += 1

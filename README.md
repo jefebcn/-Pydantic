@@ -1,4 +1,4 @@
-# Seconda Mano Hunter
+# Seconda Mano Hunter × Sander Chill House
 
 Trova le offerte **Amazon Seconda Mano** (amazon.it, da 100 € in su) con la differenza più grande rispetto al prezzo del **nuovo**. Calcola il margine applicando il vostro sconto del 22% e manda un avviso quando c'è un affare da prendere al volo.
 
@@ -7,6 +7,12 @@ PC di casa (scanner Python)  ──►  Supabase (prezzi + storico)  ──►  
         │                                                            (notifiche browser)
         └──► Telegram (avviso immediato sul telefono)
 ```
+
+La dashboard è un piccolo gestionale con quattro sezioni:
+- **Panoramica:** indicatori, offerte da prendere al volo, stato del magazzino, ultime vendite.
+- **Offerte:** classifica con filtri. ☆ segna un'offerta interessante, ✕ la ignora (e smette di mandare avvisi), 🛒 registra l'acquisto in magazzino.
+- **Magazzino:** pezzi comprati divisi per stato (ordinato → ricevuto → in vendita → venduto / reso), con costo, prezzo obiettivo, prezzo di vendita, profitto, ROI, giorni in giacenza ed export CSV.
+- **Impostazioni:** sconto, soglie degli avvisi, stato dello scanner, guida al setup.
 
 Costo: **0 €**. Supabase, Vercel e Telegram si usano col piano gratuito. Lo scanner gira sul vostro PC perché Amazon blocca le richieste che arrivano dai server cloud.
 
@@ -19,13 +25,13 @@ Costo: **0 €**. Supabase, Vercel e Telegram si usano col piano gratuito. Lo sc
 | Guadagno € | riferimento − tuo costo |
 | Margine % | 1 − tuo costo / riferimento |
 
-Lo storico a 90 giorni si costruisce col tempo, salvando i prezzi a ogni controllo. Nei primi giorni il riferimento è il prezzo nuovo attuale. Si usa il prezzo venduto da Amazon e, se Amazon non vende quel prodotto, il nuovo più basso fra gli altri venditori. La soglia degli avvisi, lo sconto e il prezzo minimo si cambiano dalla dashboard (⚙️ Soglie).
+Lo storico a 90 giorni si costruisce col tempo, salvando i prezzi a ogni controllo. Nei primi giorni il riferimento è il prezzo nuovo attuale. Si usa il prezzo venduto da Amazon e, se Amazon non vende quel prodotto, il nuovo più basso fra gli altri venditori. La soglia degli avvisi, lo sconto e il prezzo minimo si cambiano dalla dashboard, nella pagina Impostazioni.
 
 ## Setup (una volta sola)
 
 ### 1. Database Supabase
 1. Su [supabase.com](https://supabase.com) apri un progetto (va bene il piano gratuito).
-2. In **SQL Editor** incolla ed esegui `supabase/schema.sql`.
+2. In **SQL Editor → New query** incolla **tutto** il file `supabase/schema.sql` e premi **Run**. È l'unico file SQL e contiene tutto: tabelle, viste, sicurezza. Si può rilanciare senza perdere dati.
 3. In **Project Settings → API** copia il **Project URL** e la **service_role key**.
 
 ### 2. Bot Telegram
@@ -53,7 +59,7 @@ Prima di lasciarlo girare fai una prova veloce, che non salva nulla:
 Se escono prezzi sensati, lo scanner funziona. Se esce un errore di lettura, rilancia con `--debug` e mandaci i file in `scraper/debug/`.
 
 ### 4. Dashboard su Vercel
-Imposta le variabili di `.env.example` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DASHBOARD_PASSWORD`) in Vercel → Settings → Environment Variables e fai il deploy. Apri la dashboard e premi **🔔 Attiva notifiche**.
+Imposta le variabili di `.env.example` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DASHBOARD_PASSWORD`) in Vercel → Settings → Environment Variables e fai il deploy. Apri la dashboard e premi **🔔 Attiva notifiche browser** (in basso a sinistra).
 
 ## Ritmo e blocchi
 - Un ciclo ogni 20 minuti, con 4–9 secondi di pausa fra una pagina e l'altra. Le offerte di un prodotto vengono ricontrollate solo se il prezzo cambia o dopo 6 ore.
