@@ -17,7 +17,7 @@ from datetime import datetime
 
 from . import config, pace
 from .amazon import AmazonClient, CaptchaError, LocationError, SearchItem
-from .notify import format_deal, telegram
+from .notify import send_deal, telegram
 
 
 def log(msg: str) -> None:
@@ -105,7 +105,7 @@ def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
         if d.get("triage") in ("ignorato", "acquistato"):
             continue
         if margin >= min_margin and profit >= min_profit and not store.already_alerted(it.asin, used_price):
-            if telegram(format_deal(d, discount)):  # senza Telegram configurato non segna nulla
+            if send_deal(d, discount):  # senza Telegram configurato non segna nulla
                 alerts += 1
                 store.mark_alerted(it.asin, used_price)
 
