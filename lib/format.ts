@@ -22,10 +22,10 @@ export function shortCondition(c: string | null | undefined) {
 export const amazonUrl = (asin: string) => `https://www.amazon.it/dp/${asin}`;
 
 export function marginTone(m: number | null | undefined) {
-  if (m == null) return "text-zinc-400";
-  if (m >= 40) return "text-emerald-400";
-  if (m >= 25) return "text-amber-300";
-  return "text-zinc-300";
+  if (m == null) return "text-muted";
+  if (m >= 40) return "text-gain";
+  if (m >= 25) return "text-amber-600";
+  return "text-ink/70";
 }
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);

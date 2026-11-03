@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { DataProvider } from "@/components/DataProvider";
 import { Shell } from "@/components/Shell";
 import "./globals.css";
+
+const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta" });
 
 export const metadata: Metadata = {
   title: { default: "Seconda Mano Hunter × Sander Chill House", template: "%s · Seconda Mano Hunter" },
@@ -10,8 +13,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
-  colorScheme: "dark",
+  themeColor: "#e8f0fa",
+  colorScheme: "light",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -19,7 +22,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="it">
+    <html lang="it" className={jakarta.variable}>
       <body className="antialiased">
         <DataProvider>
           <Shell>{children}</Shell>

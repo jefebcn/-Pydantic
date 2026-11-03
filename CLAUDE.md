@@ -13,7 +13,7 @@ Trovare su **amazon.it** le offerte **Amazon Seconda Mano** (≥ 100 €) con il
 |---|---|---|
 | Scanner (Python, requests + BeautifulSoup) | **PC di casa degli utenti**: Amazon blocca gli IP cloud (503) | `scraper/` |
 | Database | Supabase free | `supabase/schema.sql` (tabelle + vista `deals_v`) |
-| Dashboard (gestionale) | Next.js 16 su Vercel free | `app/` (Panoramica, `offerte/`, `magazzino/`, `impostazioni/`), `components/`, `proxy.ts` (Basic Auth) |
+| Dashboard (gestionale) | Next.js 16 su Vercel free | `app/` (Panoramica, `offerte/`, `magazzino/`, `impostazioni/`), `components/`, `proxy.ts` + `lib/auth.ts` (accesso admin) |
 | Avvisi | Telegram Bot API + Notification API del browser | `scraper/notify.py`, `app/page.tsx` |
 
 Flusso dello scanner (`scraper/main.py`):
@@ -31,6 +31,8 @@ Dati della dashboard: `components/DataProvider.tsx` carica `/api/deals` e `/api/
 - Scraping educato: pause casuali, niente rotazione proxy, niente risoluzione CAPTCHA o verifiche anti-robot (AWS WAF, Akamai `bm-verify`). Se arrivano ci si ferma: `scraper/pace.py` rallenta il profilo (`SCAN_SPEED` lento/normale/veloce in `config.SPEED_PROFILES`) e raddoppia la pausa; risale dopo cicli puliti.
 - Il parsing HTML (`scraper/amazon.py`, funzioni `parse_*`) deve restare puro e coperto da `scraper/tests/`. Quando Amazon cambia layout, aggiungere l'HTML reale (da `--debug`) come fixture.
 - La service role key di Supabase si usa solo lato server: route handler e scanner, mai nei componenti client.
+- Accesso: Panoramica, Offerte e `GET /api/deals` sono pubblici. Magazzino, Impostazioni, `/api/inventory` e ogni chiamata non-GET richiedono il cookie admin (`lib/auth.ts`, login su `/accedi` con `DASHBOARD_PASSWORD`). Nuove pagine o API riservate vanno aggiunte in `needsAdmin`; i controlli di modifica nei componenti si mostrano solo se `useData().admin`.
+- Stile: tema chiaro come il design di riferimento (cornice scura, pannello bianco, card pastello). Colori e font sono token in `app/globals.css` (`ink`, `muted`, `line`, `soft`, `lilac`, `mint`, `cream`, `sky`, `gain`): usare quelli, non colori zinc o amber del vecchio tema scuro.
 - Next.js 16: il middleware si chiama `proxy.ts`. Prima di usare API nuove consultare `node_modules/next/dist/docs/`.
 
 ## Comandi

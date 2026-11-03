@@ -1,16 +1,33 @@
 @import "tailwindcss";
 
+/* Palette chiara: cornice scura, pannello bianco, card pastello */
+@theme inline {
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --color-canvas: #e8f0fa;
+  --color-frame: #1c1c20;
+  --color-ink: #17171c;
+  --color-line: #eceef3;
+  --color-soft: #f4f5f8;
+  --color-muted: #7c808c;
+  --color-lilac: #e3dcf6;
+  --color-mint: #d6efdc;
+  --color-cream: #f6edcd;
+  --color-sky: #dceafb;
+  --color-skybtn: #b5dcf7;
+  --color-gain: #2f9e63;
+}
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background: #09090b;
-  color: #f4f4f5;
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
   font-feature-settings: "cv11", "ss01";
 }
 
 select option {
-  background: #18181b;
+  background: #fff;
+  color: var(--color-ink);
 }

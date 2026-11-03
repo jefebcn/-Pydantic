@@ -93,24 +93,24 @@ function Inventory() {
       />
 
       <div className="mb-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi label="Costo pezzi" value={eur(totals.cost, 0)} />
-        <Kpi label="Profitto previsto" value={eur(totals.expected, 0)} tone="text-amber-300" hint="su prezzo obiettivo" />
-        <Kpi label="Incassato" value={eur(totals.revenue, 0)} />
-        <Kpi label="Profitto reale" value={eur(totals.profit, 0)} tone={totals.profit >= 0 ? "text-emerald-400" : "text-red-400"} />
+        <Kpi color="sky" label="Costo pezzi" value={eur(totals.cost, 0)} />
+        <Kpi color="cream" label="Profitto previsto" value={eur(totals.expected, 0)} hint="su prezzo obiettivo" />
+        <Kpi color="lilac" label="Incassato" value={eur(totals.revenue, 0)} />
+        <Kpi color="mint" label="Profitto reale" value={eur(totals.profit, 0)} tone={totals.profit >= 0 ? "" : "text-red-600"} />
       </div>
 
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca prodotto, ASIN o canale" className={`${inputCls} mb-3 max-w-sm`} />
 
       {loading ? (
-        <p className="text-zinc-500">Caricamento…</p>
+        <p className="text-muted">Caricamento…</p>
       ) : !list.length ? (
         <Empty>
-          Nessun pezzo qui. Dalle <b>Offerte</b> premi 🛒 su un prodotto comprato, oppure “Nuovo acquisto”.
+          Nessun pezzo qui. Dalle <b>Offerte</b> premi il carrello su un prodotto comprato, oppure “Nuovo acquisto”.
         </Empty>
       ) : (
-        <div className="overflow-x-auto rounded-2xl border border-white/[0.06]">
+        <div className="overflow-x-auto rounded-3xl border border-line bg-white">
           <table className="w-full min-w-[860px] text-sm">
-            <thead className="bg-white/[0.03] text-left text-[11px] uppercase tracking-wider text-zinc-500">
+            <thead className="bg-soft text-left text-[11px] text-muted">
               <tr>
                 <th className="px-3 py-2.5 font-medium">Prodotto</th>
                 <th className="px-3 py-2.5 font-medium">Stato</th>
@@ -122,21 +122,21 @@ function Inventory() {
                 <th className="px-3 py-2.5" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-white/[0.04]">
+            <tbody className="divide-y divide-line">
               {list.map((i) => (
-                <tr key={i.id} className="hover:bg-white/[0.02]">
+                <tr key={i.id} className="hover:bg-soft/70">
                   <td className="px-3 py-2.5">
                     <div className="flex items-center gap-3">
                       <Thumb src={i.image_url} size={40} />
                       <div className="min-w-0">
-                        <button onClick={() => setEditing(i)} className="line-clamp-1 max-w-[38ch] text-left font-medium hover:text-amber-300" title={i.title}>
+                        <button onClick={() => setEditing(i)} className="line-clamp-1 max-w-[38ch] text-left font-medium hover:underline" title={i.title}>
                           {i.title}
                         </button>
-                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-500">
+                        <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
                           <span>{new Date(i.purchased_at).toLocaleDateString("it-IT")}</span>
                           {i.condition && <span>· {i.condition}</span>}
                           {i.channel && <Badge>{i.channel}</Badge>}
-                          {i.asin && <a href={amazonUrl(i.asin)} target="_blank" rel="noreferrer" className="font-mono hover:text-amber-300">{i.asin}</a>}
+                          {i.asin && <a href={amazonUrl(i.asin)} target="_blank" rel="noreferrer" className="font-mono hover:underline">{i.asin}</a>}
                         </div>
                       </div>
                     </div>
@@ -147,27 +147,27 @@ function Inventory() {
                       <select
                         value={i.status}
                         onChange={(e) => changeStatus(i, e.target.value as InventoryStatus)}
-                        className="rounded-md border border-white/[0.08] bg-transparent px-1.5 py-1 text-xs outline-none focus:border-amber-400/60"
+                        className="rounded-full border border-line bg-white px-2 py-1 text-xs outline-none focus:border-ink/30"
                       >
                         {STATUS_ORDER.map((s) => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
                       </select>
                     </div>
                   </td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{eur(i.purchase_cost)}</td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-zinc-400">{eur(i.target_price)}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-muted">{eur(i.target_price)}</td>
                   <td className="px-3 py-2.5 text-right tabular-nums">{eur(i.sale_price)}</td>
                   <td className="px-3 py-2.5 text-right font-semibold tabular-nums">
                     {i.profit_eur != null ? (
-                      <span className={i.profit_eur >= 0 ? "text-emerald-400" : "text-red-400"}>
-                        {eur(i.profit_eur)} <span className="text-[11px] font-normal text-zinc-500">({i.roi_pct?.toFixed(0)}%)</span>
+                      <span className={i.profit_eur >= 0 ? "text-gain" : "text-red-600"}>
+                        {eur(i.profit_eur)} <span className="text-[11px] font-normal text-muted">({i.roi_pct?.toFixed(0)}%)</span>
                       </span>
                     ) : i.expected_profit_eur != null ? (
-                      <span className="text-amber-300/80" title="previsto">~{eur(i.expected_profit_eur)}</span>
+                      <span className="text-amber-600" title="previsto">~{eur(i.expected_profit_eur)}</span>
                     ) : (
                       "—"
                     )}
                   </td>
-                  <td className="px-3 py-2.5 text-right tabular-nums text-zinc-400">{i.days_held}</td>
+                  <td className="px-3 py-2.5 text-right tabular-nums text-muted">{i.days_held}</td>
                   <td className="px-3 py-2.5 text-right">
                     <Button size="sm" variant="ghost" onClick={() => setEditing(i)}>Modifica</Button>
                   </td>

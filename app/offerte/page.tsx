@@ -18,7 +18,7 @@ const VIEWS: Record<View, (d: Deal) => boolean> = {
 };
 
 export default function OffersPage() {
-  const { deals, loading, refresh } = useData();
+  const { deals, loading, refresh, admin } = useData();
   const [view, setView] = useState<View>("attive");
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
@@ -58,7 +58,7 @@ export default function OffersPage() {
     <>
       <PageHeader
         title="Offerte"
-        subtitle="Amazon Seconda Mano vs prezzo nuovo · ☆ segna interessante · ✕ ignora · 🛒 registra l'acquisto"
+        subtitle={admin ? "Amazon Seconda Mano vs prezzo nuovo · ☆ segna interessante · ✕ ignora · carrello registra l'acquisto" : "Amazon Seconda Mano vs prezzo nuovo, aggiornate ogni minuto"}
         actions={<Button onClick={refresh}>↻ Aggiorna</Button>}
       />
       <StatusBanner />
@@ -74,7 +74,7 @@ export default function OffersPage() {
         ]}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca titolo o ASIN" className={`${inputCls} col-span-2`} />
         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
           <option value="">Tutte le categorie</option>
@@ -91,18 +91,18 @@ export default function OffersPage() {
           <option value="price">Ordina: prezzo</option>
         </select>
         <label className={`${inputCls} flex items-center gap-2`}>
-          <span className="whitespace-nowrap text-zinc-500">Margine ≥</span>
+          <span className="whitespace-nowrap text-muted">Margine ≥</span>
           <input type="number" value={minMargin} onChange={(e) => setMinMargin(Number(e.target.value))} className="w-12 bg-transparent outline-none" />%
         </label>
         <label className={`${inputCls} flex cursor-pointer items-center gap-2`}>
-          <input type="checkbox" checked={bands} onChange={(e) => setBands(e.target.checked)} className="accent-amber-400" />
+          <input type="checkbox" checked={bands} onChange={(e) => setBands(e.target.checked)} className="accent-ink" />
           <span className="whitespace-nowrap">Per fascia di prezzo</span>
         </label>
       </div>
 
-      <p className="mb-3 text-xs text-zinc-500">{list.length} offerte</p>
+      <p className="mb-3 text-xs text-muted">{list.length} offerte</p>
       {loading ? (
-        <p className="text-zinc-500">Caricamento…</p>
+        <p className="text-muted">Caricamento…</p>
       ) : !list.length ? (
         <Empty>Nessuna offerta con questi filtri.</Empty>
       ) : bands ? (

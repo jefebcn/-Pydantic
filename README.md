@@ -14,6 +14,8 @@ La dashboard è un piccolo gestionale con quattro sezioni:
 - **Magazzino:** pezzi comprati divisi per stato (ordinato → ricevuto → in vendita → venduto / reso), con costo, prezzo obiettivo, prezzo di vendita, profitto, ROI, giorni in giacenza ed export CSV.
 - **Impostazioni:** sconto, soglie degli avvisi, stato dello scanner, guida al setup.
 
+Magazzino e Impostazioni sono riservati all'admin; Panoramica e Offerte sono pubbliche (vedi il punto 4 del setup).
+
 Costo: **0 €**. Supabase, Vercel e Telegram si usano col piano gratuito. Lo scanner gira sul vostro PC perché Amazon blocca le richieste che arrivano dai server cloud.
 
 ## Come si calcola il margine
@@ -70,7 +72,9 @@ Prima di lasciarlo girare fai una prova veloce, che non salva nulla:
 Se escono prezzi sensati, lo scanner funziona. Se esce un errore di lettura, rilancia con `--debug` e mandaci i file in `scraper/debug/`.
 
 ### 4. Dashboard su Vercel
-Imposta le variabili di `.env.example` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DASHBOARD_PASSWORD`) in Vercel → Settings → Environment Variables e fai il deploy. Apri la dashboard e premi **🔔 Attiva notifiche browser** (in basso a sinistra).
+Imposta le variabili di `.env.example` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DASHBOARD_PASSWORD`) in Vercel → Settings → Environment Variables e fai il deploy. Apri la dashboard e premi la **campanella** in alto a destra per attivare le notifiche del browser.
+
+**Chi vede cosa:** Panoramica e Offerte sono pubbliche, senza password. Magazzino, Impostazioni e le azioni sulle offerte (☆, ✕, carrello) richiedono l'accesso admin: pulsante **Accedi** in alto a destra (pagina `/accedi`), password = `DASHBOARD_PASSWORD`. L'accesso dura 30 giorni su quel dispositivo; cambiando la password su Vercel scadono tutti gli accessi. Senza `DASHBOARD_PASSWORD` chiunque può modificare.
 
 ## Ritmo e blocchi
 - Tre velocità, da scegliere con `SCAN_SPEED` in `scraper/.env` (oppure `--speed`):

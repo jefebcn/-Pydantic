@@ -1,23 +1,22 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { ADMIN_COOKIE, isAdmin, needsAdmin } from "@/lib/auth";
 
 /**
- * Protezione con password (Basic Auth) per tutta la dashboard.
- * Attiva impostando DASHBOARD_PASSWORD su Vercel. Utente: qualsiasi.
+ * Panoramica e offerte sono pubbliche. Magazzino, impostazioni e ogni modifica
+ * chiedono l'accesso admin (password DASHBOARD_PASSWORD, pagina /accedi).
  */
-export function proxy(req: NextRequest) {
-  const password = process.env.DASHBOARD_PASSWORD;
-  if (!password) return NextResponse.next();
-
-  const auth = req.headers.get("authorization") ?? "";
-  if (auth.startsWith("Basic ")) {
-    const decoded = atob(auth.slice(6));
-    const pass = decoded.slice(decoded.indexOf(":") + 1);
-    if (pass === password) return NextResponse.next();
+export async function proxy(req: NextRequest) {
+  const { pathname } = req.nextUrl;
+  if (!needsAdmin(pathname, req.method) || (await isAdmin(req.cookies.get(ADMIN_COOKIE)?.value))) {
+    return NextResponse.next();
   }
-  return new NextResponse("Accesso riservato", {
-    status: 401,
-    headers: { "WWW-Authenticate": 'Basic realm="Seconda Mano Hunter"' },
-  });
+  if (pathname.startsWith("/api/")) {
+    return NextResponse.json({ error: "Serve l'accesso admin" }, { status: 401 });
+  }
+  const url = req.nextUrl.clone();
+  url.pathname = "/accedi";
+  url.search = `?next=${encodeURIComponent(pathname)}`;
+  return NextResponse.redirect(url);
 }
 
 export const config = {

@@ -16,6 +16,9 @@ interface Ctx {
   error: string;
   updatedAt: Date | null;
   notifyOn: boolean;
+  /** true dopo il login admin (o se il sito non ha password) */
+  admin: boolean;
+  logout: () => Promise<void>;
   enableNotifications: () => Promise<void>;
   refresh: () => Promise<void>;
   setTriage: (asin: string, triage: Triage) => Promise<void>;
@@ -80,6 +83,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState("");
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [notifyOn, setNotifyOn] = useState(false);
+  const [admin, setAdmin] = useState(false);
   const seenRef = useRef<Set<string> | null>(null);
 
   const notifyNew = useCallback((list: Deal[], s: Settings | null) => {
@@ -111,13 +115,13 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [d, inv] = await Promise.all([
-        call<{ deals: Deal[]; settings: Settings; scanner: ScannerStatus }>("/api/deals"),
-        call<{ items: InventoryItem[] }>("/api/inventory"),
-      ]);
+      const d = await call<{ deals: Deal[]; settings: Settings; scanner: ScannerStatus; admin: boolean }>("/api/deals");
+      // il magazzino è riservato: lo carica solo chi ha fatto l'accesso admin
+      const inv = d.admin ? await call<{ items: InventoryItem[] }>("/api/inventory") : { items: [] };
       setDeals(d.deals ?? []);
       setSettings(d.settings);
       setScanner(d.scanner);
+      setAdmin(!!d.admin);
       setInventory(inv.items ?? []);
       setError("");
       setUpdatedAt(new Date());
@@ -146,6 +150,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const p = await Notification.requestPermission();
     setNotifyOn(p === "granted");
     if (p === "granted") new Notification("Notifiche attive ✅", { body: "Ti avviso quando arriva un'offerta sopra soglia." });
+  };
+
+  const logout = async () => {
+    await fetch("/api/logout", { method: "POST" });
+    window.location.href = "/";
   };
 
   const setTriage = async (asin: string, triage: Triage) => {
@@ -177,7 +186,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   return (
     <DataCtx.Provider
       value={{
-        deals, settings, scanner, inventory, loading, error, updatedAt, notifyOn,
+        deals, settings, scanner, inventory, loading, error, updatedAt, notifyOn, admin, logout,
         enableNotifications, refresh, setTriage, saveSettings, addItem, updateItem, deleteItem,
       }}
     >
