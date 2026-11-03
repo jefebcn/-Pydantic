@@ -28,6 +28,15 @@ def test_clean_cycles_step_back_up_but_not_above_configured():
     assert pace.current_level(state, "normale") == "normale"
 
 
+def test_pause_survives_restart_and_clears_after_clean_cycle():
+    state: dict = {}
+    pause = pace.on_block(state, "normale", now=1000.0)
+    assert pace.wait_seconds(state, now=1000.0) == pause * 60   # lo stato salvato ricorda la pausa
+    assert pace.wait_seconds(state, now=1000.0 + pause * 60 + 1) == 0
+    pace.on_clean_cycle(state, "normale")
+    assert "resume_at" not in state and pace.wait_seconds(state) == 0
+
+
 def test_raising_scan_speed_applies_at_once_without_blocks():
     state: dict = {}
     pace.on_clean_cycle(state, "lento")

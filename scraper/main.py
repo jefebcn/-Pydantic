@@ -4,6 +4,7 @@ Uso (dalla cartella del progetto):
     python -m scraper.main              # gira per sempre, al ritmo di SCAN_SPEED (default lento)
     python -m scraper.main --speed normale     # profilo massimo diverso (lento | normale | veloce)
     python -m scraper.main --once       # un solo ciclo
+    python -m scraper.main --telegram-setup    # nome, foto, biografia e comandi del bot Telegram
     python -m scraper.main --test B0XXXXXXXX   # prova un ASIN, stampa le offerte (non salva nulla)
     python -m scraper.main --search notebook   # prova una ricerca (non salva nulla)
     aggiungi --debug per salvare l'HTML scaricato in scraper/debug/
@@ -12,10 +13,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import threading
 import time
 from datetime import datetime
 
-from . import config, pace
+from . import bot, config, pace
 from .amazon import AmazonClient, CaptchaError, LocationError, SearchItem
 from .notify import send_deal, telegram
 
@@ -137,7 +139,13 @@ def main() -> None:
     ap.add_argument("--search", metavar="KEYWORD")
     ap.add_argument("--debug", action="store_true")
     ap.add_argument("--speed", choices=config.SPEED_ORDER, help="profilo massimo (sovrascrive SCAN_SPEED)")
+    ap.add_argument("--telegram-setup", action="store_true",
+                    help="imposta nome, foto, biografia e comandi del bot Telegram ed esce")
     a = ap.parse_args()
+    if a.telegram_setup:
+        for label, result in bot.set_profile(config.ROOT / "assets" / "bot_avatar.jpg").items():
+            print(f"{label:<15} {'ok' if result is True else result}")
+        return
     if a.debug:
         config.DEBUG = True
         config.DEBUG_DIR.mkdir(exist_ok=True)
@@ -156,6 +164,9 @@ def main() -> None:
 
     from .store import Store
     store = Store()
+    if config.TELEGRAM_BOT_TOKEN:
+        threading.Thread(target=bot.run_forever, args=(store,), daemon=True, name="telegram-bot").start()
+        log("bot Telegram: comandi /top /stato /chatid /help attivi")
     state = load_state()
     configured = config.SCAN_SPEED
     log(f"avvio — {len(config.SEARCHES)} ricerche, velocità massima '{configured}', "
@@ -167,11 +178,19 @@ def main() -> None:
         if client is None:
             client = AmazonClient()
         client.delay = (prof["delay_min_s"], prof["delay_max_s"])
+        wait = pace.wait_seconds(state)
+        if wait and not a.once:  # pausa dopo un blocco ancora in corso (anche dopo un riavvio)
+            log(f"pausa dopo il blocco di Amazon: riparto alle "
+                f"{datetime.fromtimestamp(state['resume_at']):%H:%M}")
+            time.sleep(wait)
+            continue
         log(f"ciclo '{level}': {prof['searches_per_cycle'] or len(config.SEARCHES)} ricerche, "
             f"max {prof['max_offer_fetches']} pannelli offerte")
+        search_pos = state.get("search_pos", 0)
         try:
             run_cycle(client, store, prof, state)
         except CaptchaError as e:
+            state["search_pos"] = search_pos  # le ricerche di questo giro si rifanno al prossimo
             pause_min = pace.on_block(state, configured)
             save_state(state)
             client = None  # dopo un blocco si riparte con una sessione nuova
@@ -181,7 +200,6 @@ def main() -> None:
                      f"a velocità '{new_level}'.")
             if a.once:
                 return
-            time.sleep(pause_min * 60)
             continue
         except Exception as e:  # rete instabile, CAP non impostato ecc.: non fermarti
             log(f"errore: {e!r}")

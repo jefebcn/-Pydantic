@@ -11,15 +11,35 @@ from . import config
 CAPTION_MAX = 1024   # limite Telegram per la didascalia di una foto
 
 
-def _api(method: str, payload: dict) -> bool:
-    if not config.TELEGRAM_BOT_TOKEN or not config.TELEGRAM_CHAT_ID:
+def parse_chats(raw: str) -> list[tuple[str, int | None]]:
+    """TELEGRAM_CHAT_ID: una o più chat separate da virgola; "id:topic" per un topic di un gruppo con argomenti.
+    Es. "8498296680, -1001234567890:42" → [("8498296680", None), ("-1001234567890", 42)]."""
+    out = []
+    for part in (p.strip() for p in raw.split(",")):
+        chat, _, topic = part.partition(":")
+        if chat.strip():
+            out.append((chat.strip(), int(topic) if topic.strip().isdigit() else None))
+    return out
+
+
+def post(method: str, chat: str, payload: dict, topic: int | None = None) -> bool:
+    """Una chiamata alla Bot API verso una chat."""
+    if not config.TELEGRAM_BOT_TOKEN:
         return False
+    body = {"chat_id": chat, "parse_mode": "HTML", **payload}
+    if topic:
+        body["message_thread_id"] = topic
     try:
-        r = requests.post(f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/{method}",
-                          json={"chat_id": config.TELEGRAM_CHAT_ID, "parse_mode": "HTML", **payload}, timeout=20)
+        r = requests.post(f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/{method}", json=body, timeout=20)
         return r.ok
     except requests.RequestException:
         return False
+
+
+def _api(method: str, payload: dict) -> bool:
+    """Manda a tutte le chat configurate; True se almeno una l'ha ricevuto."""
+    sent = [post(method, chat, payload, topic) for chat, topic in parse_chats(config.TELEGRAM_CHAT_ID)]
+    return any(sent)
 
 
 def telegram(text: str, buttons: list | None = None) -> bool:

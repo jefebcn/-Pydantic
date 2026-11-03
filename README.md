@@ -35,9 +35,20 @@ Lo storico a 90 giorni si costruisce col tempo, salvando i prezzi a ogni control
 3. In **Project Settings → API** copia il **Project URL** e la **service_role key**.
 
 ### 2. Bot Telegram
-1. Su Telegram scrivi a **@BotFather** → `/newbot` e copia il **token**.
-2. Manda un messaggio qualsiasi al tuo bot. Puoi anche aggiungerlo a un gruppo con il socio.
-3. Apri `https://api.telegram.org/bot<TOKEN>/getUpdates` nel browser e copia il numero `chat.id`.
+1. Su Telegram scrivi a **@BotFather** → `/newbot` e copia il **token** in `TELEGRAM_BOT_TOKEN` (`scraper/.env`).
+2. Lancia una volta `python -m scraper.main --telegram-setup`: imposta nome, foto (`scraper/assets/bot_avatar.jpg`), biografia, descrizione e comandi del bot.
+3. Avvia lo scanner, scrivi `/chatid` al bot e metti il numero in `TELEGRAM_CHAT_ID`, poi riavvia lo scanner.
+
+Gli avvisi arrivano come foto del prodotto con margine, prezzi e pulsanti "Apri su Amazon" e "Gestionale". Il bot risponde anche a comandi:
+
+| Comando | Cosa fa | Dove |
+|---|---|---|
+| `/top` | le 5 offerte attive con più guadagno | solo chat collegate |
+| `/stato` | ultimo controllo, velocità, offerte attive e sopra soglia | solo chat collegate |
+| `/chatid` | ID della chat (e del topic) da mettere in `TELEGRAM_CHAT_ID` | ovunque |
+| `/help` | cosa fa il bot | ovunque |
+
+**Gruppo dedicato agli avvisi:** crea il gruppo, aggiungi il bot (in un canale come amministratore). Il bot scrive da solo l'ID del gruppo; aggiungilo a `TELEGRAM_CHAT_ID` separato da virgola (es. `8498296680,-1001234567890`) e riavvia lo scanner. In un gruppo con argomenti usa `id_gruppo:id_topic` (te lo dà `/chatid` scritto nel topic). La foto del gruppo può essere la stessa del bot.
 
 ### 3. Scanner sul PC
 Requisito: Python 3.10+ ([python.org](https://www.python.org/downloads/); su Windows spunta *Add to PATH*).
