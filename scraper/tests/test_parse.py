@@ -1,5 +1,10 @@
-"""Test del parsing su HTML sintetico che imita la struttura di amazon.it."""
-from scraper.amazon import is_captcha, parse_offers, parse_price, parse_search
+"""Test del parsing su HTML sintetico che imita la struttura di amazon.it, più fixture reali."""
+from pathlib import Path
+
+from scraper.amazon import (is_captcha, parse_glow_csrf, parse_location_modal, parse_offers, parse_price,
+                            parse_product_page_price, parse_search)
+
+FIXTURES = Path(__file__).parent / "fixtures"
 
 SEARCH_HTML = """
 <div data-component-type="s-search-result" data-asin="B0TEST0001">
@@ -62,6 +67,21 @@ def test_parse_search():
     assert items[1].price == 189.50
 
 
+def test_parse_search_real_2026_layout():
+    """HTML reale: il prezzo usato sta nella riga 'Ulteriori opzioni di acquisto', senza .a-price."""
+    html = (FIXTURES / "search_warehouse_2026-11.html").read_text(encoding="utf-8")
+    items = {i.asin: i for i in parse_search(html)}
+    assert len(items) == 11
+    assert items["B0GMQHW2WC"].price == 1598.22
+    assert items["B0GMQ65L5B"].price == 2892.75
+    assert items["B0DS5N6MWW"].price == 841.22
+    assert items["B0GMQHW2WC"].title.startswith("Lenovo IdeaPad Pro 5")
+    assert items["B0GMQHW2WC"].image_url
+    # risultati senza prezzo in pagina: restano None (lo legge poi il pannello offerte)
+    assert items["B0CH162WZW"].price is None
+    assert sum(i.price is not None for i in items.values()) == 8
+
+
 def test_parse_offers_picks_cheapest_seconda_mano_and_amazon_new():
     s = parse_offers(AOD_HTML)
     assert len(s.offers) == 5
@@ -72,9 +92,50 @@ def test_parse_offers_picks_cheapest_seconda_mano_and_amazon_new():
     assert s.new_price_any == 1399.00    # più basso di qualsiasi venditore
 
 
+def test_parse_offers_real_2026_layout():
+    """HTML reale del pannello offerte con CAP italiano: due offerte Amazon Seconda Mano, nessun nuovo."""
+    s = parse_offers((FIXTURES / "aod_seconda_mano_2026-11.html").read_text(encoding="utf-8"))
+    assert [(o.price, o.condition, o.seller) for o in s.offers] == [
+        (953.14, "Usato - Ottime condizioni", "Amazon Seconda mano"),
+        (973.20, "Usato - Come nuovo", "Amazon Seconda mano"),
+    ]
+    assert all(o.is_seconda_mano and not o.is_new for o in s.offers)
+    assert s.used_price == 953.14
+    assert s.used_condition == "Usato - Ottime condizioni"
+    assert s.new_price is None and s.new_price_any is None
+
+
+def test_product_page_price_ignores_used_only_buybox():
+    """Pagina reale con solo 'Acquista Usato 953,14 €': non è il prezzo del nuovo."""
+    html = (FIXTURES / "dp_solo_usato_2026-11.html").read_text(encoding="utf-8")
+    assert parse_product_page_price(html) is None
+    new_html = ('<div id="corePriceDisplay_desktop_feature_div"><span class="a-price">'
+                '<span class="a-offscreen">749,00 €</span></span></div>')
+    assert parse_product_page_price(new_html) == 749.0
+
+
+def test_parse_location_modal():
+    # stessa struttura del tag nella barra di amazon.it (token finti)
+    html = ('<span id="nav-global-location-data-modal-action" class="a-declarative" '
+            'data-a-modal=\'{"width":375, "closeButton":"true","popoverLabel":"Seleziona la tua posizione", '
+            '"ajaxHeaders":{"anti-csrftoken-a2z":"tok-AAA"}, "name":"glow-modal", '
+            '"url":"/portal-migration/hz/glow/get-rendered-address-selections?deviceType=desktop&amp;pageType=Search", '
+            '"header":"Seleziona la tua posizione"}\'></span>')
+    url, token = parse_location_modal(html)
+    assert url == "/portal-migration/hz/glow/get-rendered-address-selections?deviceType=desktop&pageType=Search"
+    assert token == "tok-AAA"
+    assert parse_location_modal("<div>niente</div>") is None
+    assert parse_glow_csrf('<script>P.declare("GLUXConfig", {CSRF_TOKEN : "tok-BBB", IDs: {}})</script>') == "tok-BBB"
+    assert parse_glow_csrf("<div></div>") is None
+
+
 def test_captcha_detection():
     assert is_captcha('<form action="/errors/validateCaptcha">')
     assert not is_captcha(SEARCH_HTML)
+    assert is_captcha((FIXTURES / "aws_waf_challenge_2026-11.html").read_text(encoding="utf-8"))
+    assert is_captcha((FIXTURES / "akamai_bm_verify_2026-11.html").read_text(encoding="utf-8"))
+    assert not is_captcha((FIXTURES / "aod_seconda_mano_2026-11.html").read_text(encoding="utf-8"))
+    assert not is_captcha((FIXTURES / "search_warehouse_2026-11.html").read_text(encoding="utf-8"))
 
 
 def test_normalize_supabase_url():

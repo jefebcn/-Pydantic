@@ -63,6 +63,7 @@ export type InventoryInput = Partial<Omit<InventoryItem, "id" | "created_at" | "
 
 export interface ScannerStatus {
   last_check: string | null;
+  db?: string;
 }
 
 export const STATUS_LABEL: Record<InventoryStatus, string> = {

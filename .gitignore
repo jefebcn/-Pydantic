@@ -35,3 +35,4 @@ tsconfig.tsbuildinfo
 scraper/.env
 scraper/.cache.json
 scraper/debug/
+scraper/.state.json

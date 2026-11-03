@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { useData } from "@/components/DataProvider";
-import { DealsTable } from "@/components/DealsTable";
+import { DealsByBand } from "@/components/DealsTable";
 import { StatusBanner } from "@/components/StatusBanner";
 import { Badge, Card, Empty, Kpi, PageHeader } from "@/components/ui";
 import { STATUS_LABEL, STATUS_ORDER } from "@/lib/types";
@@ -24,6 +24,7 @@ export default function Overview() {
     const sum = (a: number[]) => a.reduce((s, v) => s + v, 0);
     return {
       live,
+      liveByProfit: live.slice().sort((a, b) => (b.profit_eur ?? 0) - (a.profit_eur ?? 0)),
       hot,
       best: live.reduce((m, d) => Math.max(m, d.margin_pct ?? 0), 0),
       capital: sum(inStock.map((i) => i.purchase_cost)),
@@ -55,13 +56,15 @@ export default function Overview() {
       <div className="mt-6 grid gap-6 2xl:grid-cols-[1fr_320px]">
         <section>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">🔥 Da prendere al volo</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-zinc-400">
+              Offerte attive per fascia di prezzo · più guadagno in alto
+            </h2>
             <Link href="/offerte" className="text-sm text-amber-400 hover:underline">Tutte le offerte →</Link>
           </div>
-          {!loading && k.hot.length === 0 && k.live.length === 0 ? (
+          {!loading && k.live.length === 0 ? (
             <Empty>Nessuna offerta attiva. Lo scanner sul PC è acceso?</Empty>
           ) : (
-            <DealsTable deals={(k.hot.length ? k.hot : k.live).slice(0, 8)} />
+            <DealsByBand deals={k.liveByProfit} limit={5} />
           )}
         </section>
 

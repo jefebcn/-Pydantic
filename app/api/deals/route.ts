@@ -23,7 +23,8 @@ export async function GET() {
     return NextResponse.json({
       deals: deals.data,
       settings: settings.data,
-      scanner: { last_check: last.data?.[0]?.checked_at ?? null },
+      // il nome host (non segreto) mostra in Impostazioni a quale progetto Supabase è collegato il sito
+      scanner: { last_check: last.data?.[0]?.checked_at ?? null, db: supabaseHost() },
     });
   } catch (e) {
     // il nome host (non segreto) aiuta a capire se punta al progetto Supabase giusto

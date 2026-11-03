@@ -5,7 +5,7 @@ import { Badge, Button, Thumb } from "./ui";
 import { useData } from "./DataProvider";
 import { InventoryModal } from "./InventoryModal";
 import type { Deal, InventoryInput } from "@/lib/types";
-import { ago, amazonUrl, eur, marginTone, shortCondition } from "@/lib/format";
+import { ago, amazonUrl, byPriceBand, eur, marginTone, shortCondition } from "@/lib/format";
 
 function TriageBadge({ d }: { d: Deal }) {
   if (d.triage === "interessante") return <Badge tone="amber">★ Interessante</Badge>;
@@ -128,5 +128,24 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
 
       <InventoryModal item={buying} onClose={() => setBuying(null)} />
     </>
+  );
+}
+
+/** Offerte divise per fascia di prezzo usato; dentro ogni fascia resta l'ordine ricevuto. */
+export function DealsByBand({ deals, limit }: { deals: Deal[]; limit?: number }) {
+  return (
+    <div className="grid gap-6">
+      {byPriceBand(deals).map((g) => (
+        <section key={g.label}>
+          <h3 className="mb-2 flex items-baseline gap-2 text-sm font-semibold text-zinc-200">
+            {g.label}
+            <span className="text-xs font-normal text-zinc-500">
+              {limit && g.items.length > limit ? `prime ${limit} di ${g.items.length}` : `${g.items.length} offerte`}
+            </span>
+          </h3>
+          <DealsTable deals={limit ? g.items.slice(0, limit) : g.items} />
+        </section>
+      ))}
+    </div>
   );
 }

@@ -34,6 +34,18 @@ class Store:
         self._req("POST", "products?on_conflict=asin", json=row,
                   headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
 
+    def upsert_products(self, items: list[tuple[str, str, str, str | None]]) -> None:
+        """Come upsert_product ma per molti (asin, titolo, categoria, immagine) in una sola richiesta."""
+        now = datetime.now(timezone.utc).isoformat()
+        rows = [{"asin": a, "title": t[:500], "category": c, "last_seen_at": now, "image_url": i}
+                for a, t, c, i in items]
+        # PostgREST vuole le stesse chiavi in ogni riga: chi non ha immagine va a parte per non cancellarla
+        for batch in ([r for r in rows if r["image_url"]],
+                      [{k: v for k, v in r.items() if k != "image_url"} for r in rows if not r["image_url"]]):
+            if batch:
+                self._req("POST", "products?on_conflict=asin", json=batch,
+                          headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+
     def add_snapshot(self, asin: str, used_price, used_condition, new_price, new_price_any) -> None:
         self._req("POST", "price_snapshots", json={
             "asin": asin, "used_price": used_price, "used_condition": used_condition,

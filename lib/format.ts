@@ -29,3 +29,21 @@ export function marginTone(m: number | null | undefined) {
 }
 
 export const todayISO = () => new Date().toISOString().slice(0, 10);
+
+/** Fasce di prezzo Seconda Mano per raggruppare le offerte (estremo superiore escluso). */
+export const PRICE_BANDS = [
+  { label: "100 – 399 €", min: 0, max: 400 },
+  { label: "400 – 649 €", min: 400, max: 650 },
+  { label: "650 – 999 €", min: 650, max: 1000 },
+  { label: "1.000 – 1.599 €", min: 1000, max: 1600 },
+  { label: "1.600 – 3.000 €", min: 1600, max: 3000.01 },
+  { label: "Oltre 3.000 €", min: 3000.01, max: Infinity },
+];
+
+/** Divide le offerte per fascia di prezzo usato, mantenendo l'ordine ricevuto; salta le fasce vuote. */
+export function byPriceBand<T extends { used_price: number | null }>(items: T[]) {
+  return PRICE_BANDS.map((b) => ({
+    ...b,
+    items: items.filter((d) => (d.used_price ?? 0) >= b.min && (d.used_price ?? 0) < b.max),
+  })).filter((g) => g.items.length);
+}

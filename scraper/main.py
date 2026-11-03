@@ -1,7 +1,8 @@
 """Ciclo principale: cerca offerte Seconda Mano, salva prezzi, invia avvisi.
 
 Uso (dalla cartella del progetto):
-    python -m scraper.main              # gira per sempre, un ciclo ogni CYCLE_MINUTES
+    python -m scraper.main              # gira per sempre, al ritmo di SCAN_SPEED (default lento)
+    python -m scraper.main --speed normale     # profilo massimo diverso (lento | normale | veloce)
     python -m scraper.main --once       # un solo ciclo
     python -m scraper.main --test B0XXXXXXXX   # prova un ASIN, stampa le offerte (non salva nulla)
     python -m scraper.main --search notebook   # prova una ricerca (non salva nulla)
@@ -14,11 +15,9 @@ import json
 import time
 from datetime import datetime
 
-from . import config
-from .amazon import AmazonClient, CaptchaError, SearchItem
+from . import config, pace
+from .amazon import AmazonClient, CaptchaError, LocationError, SearchItem
 from .notify import format_deal, telegram
-
-MAX_OFFER_FETCHES_PER_CYCLE = 150
 
 
 def log(msg: str) -> None:
@@ -36,6 +35,17 @@ def save_cache(cache: dict) -> None:
     config.CACHE_FILE.write_text(json.dumps(cache))
 
 
+def load_state() -> dict:
+    try:
+        return json.loads(config.STATE_FILE.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def save_state(state: dict) -> None:
+    config.STATE_FILE.write_text(json.dumps(state))
+
+
 def needs_check(item: SearchItem, cache: dict) -> bool:
     c = cache.get(item.asin)
     if not c:
@@ -45,17 +55,17 @@ def needs_check(item: SearchItem, cache: dict) -> bool:
     return (time.time() - c.get("ts", 0)) > config.RECHECK_HOURS * 3600
 
 
-def run_cycle(client: AmazonClient, store) -> None:
+def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
     settings = store.settings()
     min_margin = float(config.ALERT_MARGIN_PCT or settings.get("alert_margin_pct", 40))
     min_profit = float(config.ALERT_PROFIT_EUR or settings.get("alert_profit_eur", 50))
     discount = float(settings.get("discount_pct", config.DISCOUNT_PCT))
     cache = load_cache()
 
-    # 1) raccogli tutte le offerte dalle ricerche
+    # 1) raccogli le offerte dalle ricerche di questo giro (a rotazione)
     found: dict[str, tuple[SearchItem, str]] = {}
-    for category, keyword in config.SEARCHES:
-        for page in range(1, config.PAGES_PER_SEARCH + 1):
+    for category, keyword in pace.next_searches(state, config.SEARCHES, prof["searches_per_cycle"]):
+        for page in range(1, prof["pages_per_search"] + 1):
             items = client.search_seconda_mano(keyword, page)
             fresh = [i for i in items if i.price is None or i.price >= config.MIN_USED_PRICE]
             log(f"ricerca '{keyword}' p{page}: {len(items)} risultati, {len(fresh)} ≥ {config.MIN_USED_PRICE:.0f}€")
@@ -64,13 +74,12 @@ def run_cycle(client: AmazonClient, store) -> None:
             if len(items) < 10:
                 break
 
-    for it, category in found.values():
-        store.upsert_product(it.asin, it.title, category, it.image_url)
+    store.upsert_products([(it.asin, it.title, category, it.image_url) for it, category in found.values()])
 
     # 2) controlla le offerte: prima i mai visti, poi i prezzi cambiati, poi i vecchi
     todo = [(it, cat) for it, cat in found.values() if needs_check(it, cache)]
     todo.sort(key=lambda x: (x[0].asin in cache, -(x[0].price or 0)))
-    todo = todo[:MAX_OFFER_FETCHES_PER_CYCLE]
+    todo = todo[:prof["max_offer_fetches"]]
     log(f"{len(found)} prodotti trovati, controllo offerte su {len(todo)}")
 
     alerts = 0
@@ -96,9 +105,9 @@ def run_cycle(client: AmazonClient, store) -> None:
         if d.get("triage") in ("ignorato", "acquistato"):
             continue
         if margin >= min_margin and profit >= min_profit and not store.already_alerted(it.asin, used_price):
-            if telegram(format_deal(d, discount)):
+            if telegram(format_deal(d, discount)):  # senza Telegram configurato non segna nulla
                 alerts += 1
-            store.mark_alerted(it.asin, used_price)
+                store.mark_alerted(it.asin, used_price)
 
     log(f"ciclo finito: {alerts} avvisi inviati")
 
@@ -127,9 +136,13 @@ def main() -> None:
     ap.add_argument("--test", metavar="ASIN")
     ap.add_argument("--search", metavar="KEYWORD")
     ap.add_argument("--debug", action="store_true")
+    ap.add_argument("--speed", choices=config.SPEED_ORDER, help="profilo massimo (sovrascrive SCAN_SPEED)")
     a = ap.parse_args()
     if a.debug:
+        config.DEBUG = True
         config.DEBUG_DIR.mkdir(exist_ok=True)
+    if a.speed:
+        config.SCAN_SPEED = a.speed
 
     try:
         if a.test:
@@ -138,27 +151,49 @@ def main() -> None:
             return cmd_search(a.search)
     except CaptchaError as e:
         raise SystemExit(f"Bloccato da Amazon: {e}\nRiprova tra un po' (o apri amazon.it nel browser e risolvi il CAPTCHA).")
+    except LocationError as e:
+        raise SystemExit(f"{e}\nRiprova tra un po'; se continua, rilancia con --debug e controlla scraper/debug/.")
 
     from .store import Store
     store = Store()
-    log(f"avvio — {len(config.SEARCHES)} ricerche, un ciclo ogni {config.CYCLE_MINUTES} min")
+    state = load_state()
+    configured = config.SCAN_SPEED
+    log(f"avvio — {len(config.SEARCHES)} ricerche, velocità massima '{configured}', "
+        f"attuale '{pace.current_level(state, configured)}'")
+    client = None  # stessa sessione (cookie + CAP) per più cicli, come un visitatore normale
     while True:
-        client = AmazonClient()
+        level = pace.current_level(state, configured)
+        prof = config.profile(level)
+        if client is None:
+            client = AmazonClient()
+        client.delay = (prof["delay_min_s"], prof["delay_max_s"])
+        log(f"ciclo '{level}': {prof['searches_per_cycle'] or len(config.SEARCHES)} ricerche, "
+            f"max {prof['max_offer_fetches']} pannelli offerte")
         try:
-            run_cycle(client, store)
+            run_cycle(client, store, prof, state)
         except CaptchaError as e:
-            log(f"⚠️  {e} — pausa {config.CAPTCHA_PAUSE_MIN} min")
-            telegram(f"⚠️ Amazon ha chiesto il CAPTCHA, lo scanner riparte tra {config.CAPTCHA_PAUSE_MIN} minuti.")
+            pause_min = pace.on_block(state, configured)
+            save_state(state)
+            client = None  # dopo un blocco si riparte con una sessione nuova
+            new_level = pace.current_level(state, configured)
+            log(f"⚠️  {e} — pausa {pause_min} min, poi velocità '{new_level}'")
+            telegram(f"⚠️ Amazon ha chiesto la verifica anti-robot: lo scanner riparte tra {pause_min} minuti "
+                     f"a velocità '{new_level}'.")
             if a.once:
                 return
-            time.sleep(config.CAPTCHA_PAUSE_MIN * 60)
+            time.sleep(pause_min * 60)
             continue
-        except Exception as e:  # rete instabile ecc.: non fermarti
+        except Exception as e:  # rete instabile, CAP non impostato ecc.: non fermarti
             log(f"errore: {e!r}")
+            client = None
+        else:
+            if pace.on_clean_cycle(state, configured):
+                log(f"{config.STEP_UP_AFTER_CYCLES} cicli senza blocchi: velocità '{state['level']}'")
+        save_state(state)
         if a.once:
             return
-        log(f"prossimo ciclo tra {config.CYCLE_MINUTES} min")
-        time.sleep(config.CYCLE_MINUTES * 60)
+        log(f"prossimo ciclo tra {prof['cycle_minutes']} min")
+        time.sleep(prof["cycle_minutes"] * 60)
 
 
 if __name__ == "__main__":

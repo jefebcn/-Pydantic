@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useData } from "@/components/DataProvider";
-import { DealsTable } from "@/components/DealsTable";
+import { DealsByBand, DealsTable } from "@/components/DealsTable";
 import { StatusBanner } from "@/components/StatusBanner";
 import { Button, Empty, PageHeader, Tabs, inputCls } from "@/components/ui";
 import type { Deal } from "@/lib/types";
@@ -23,8 +23,9 @@ export default function OffersPage() {
   const [q, setQ] = useState("");
   const [category, setCategory] = useState("");
   const [condition, setCondition] = useState("");
-  const [minMargin, setMinMargin] = useState(15);
-  const [sort, setSort] = useState<"margin" | "profit" | "recent" | "price">("margin");
+  const [minMargin, setMinMargin] = useState(0);
+  const [sort, setSort] = useState<"margin" | "profit" | "recent" | "price">("profit");
+  const [bands, setBands] = useState(true);
 
   const categories = useMemo(() => [...new Set(deals.map((d) => d.category).filter(Boolean))].sort() as string[], [deals]);
   const conditions = useMemo(
@@ -73,7 +74,7 @@ export default function OffersPage() {
         ]}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca titolo o ASIN" className={`${inputCls} col-span-2`} />
         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
           <option value="">Tutte le categorie</option>
@@ -93,10 +94,22 @@ export default function OffersPage() {
           <span className="whitespace-nowrap text-zinc-500">Margine ≥</span>
           <input type="number" value={minMargin} onChange={(e) => setMinMargin(Number(e.target.value))} className="w-12 bg-transparent outline-none" />%
         </label>
+        <label className={`${inputCls} flex cursor-pointer items-center gap-2`}>
+          <input type="checkbox" checked={bands} onChange={(e) => setBands(e.target.checked)} className="accent-amber-400" />
+          <span className="whitespace-nowrap">Per fascia di prezzo</span>
+        </label>
       </div>
 
       <p className="mb-3 text-xs text-zinc-500">{list.length} offerte</p>
-      {loading ? <p className="text-zinc-500">Caricamento…</p> : list.length ? <DealsTable deals={list} /> : <Empty>Nessuna offerta con questi filtri.</Empty>}
+      {loading ? (
+        <p className="text-zinc-500">Caricamento…</p>
+      ) : !list.length ? (
+        <Empty>Nessuna offerta con questi filtri.</Empty>
+      ) : bands ? (
+        <DealsByBand deals={list} />
+      ) : (
+        <DealsTable deals={list} />
+      )}
     </>
   );
 }

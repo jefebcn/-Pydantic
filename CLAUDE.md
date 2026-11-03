@@ -17,6 +17,7 @@ Trovare su **amazon.it** le offerte **Amazon Seconda Mano** (≥ 100 €) con il
 | Avvisi | Telegram Bot API + Notification API del browser | `scraper/notify.py`, `app/page.tsx` |
 
 Flusso dello scanner (`scraper/main.py`):
+0. Imposta il CAP di consegna `DELIVERY_ZIP` (default 20121) col popup "Seleziona la tua posizione" (`AmazonClient.set_location`). Gli utenti sono a San Marino: senza CAP italiano Amazon mostra "Non disponibile" e nasconde prezzi e offerte. La homepage di amazon.it dà la verifica anti-robot AWS WAF, quindi non si usa.
 1. Ricerca `amazon.it/s?k=…&i=warehouse-deals&rh=p_36:10000-` per ogni voce in `SEARCHES`.
 2. Per ogni ASIN nuovo o con prezzo cambiato legge il pannello offerte AOD: `/gp/product/ajax/aodAjaxMain/?asin=…`.
 3. Salva lo snapshot in `price_snapshots`.
@@ -27,7 +28,7 @@ Dati della dashboard: `components/DataProvider.tsx` carica `/api/deals` e `/api/
 ## Regole
 - Il calcolo del margine sta **solo** nella vista SQL `deals_v`, il profitto del magazzino solo in `inventory_v`. Scanner e dashboard le leggono, non ricalcolano.
 - Offerte con `triage` ignorato o acquistato non generano avvisi.
-- Scraping educato: pause casuali, niente rotazione proxy, niente risoluzione CAPTCHA. Se arriva il CAPTCHA ci si ferma.
+- Scraping educato: pause casuali, niente rotazione proxy, niente risoluzione CAPTCHA o verifiche anti-robot (AWS WAF, Akamai `bm-verify`). Se arrivano ci si ferma: `scraper/pace.py` rallenta il profilo (`SCAN_SPEED` lento/normale/veloce in `config.SPEED_PROFILES`) e raddoppia la pausa; risale dopo cicli puliti.
 - Il parsing HTML (`scraper/amazon.py`, funzioni `parse_*`) deve restare puro e coperto da `scraper/tests/`. Quando Amazon cambia layout, aggiungere l'HTML reale (da `--debug`) come fixture.
 - La service role key di Supabase si usa solo lato server: route handler e scanner, mai nei componenti client.
 - Next.js 16: il middleware si chiama `proxy.ts`. Prima di usare API nuove consultare `node_modules/next/dist/docs/`.

@@ -62,8 +62,17 @@ Se escono prezzi sensati, lo scanner funziona. Se esce un errore di lettura, ril
 Imposta le variabili di `.env.example` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DASHBOARD_PASSWORD`) in Vercel → Settings → Environment Variables e fai il deploy. Apri la dashboard e premi **🔔 Attiva notifiche browser** (in basso a sinistra).
 
 ## Ritmo e blocchi
-- Un ciclo ogni 20 minuti, con 4–9 secondi di pausa fra una pagina e l'altra. Le offerte di un prodotto vengono ricontrollate solo se il prezzo cambia o dopo 6 ore.
-- Se Amazon chiede il CAPTCHA, lo scanner si ferma 30 minuti e avvisa su Telegram. Non prova ad aggirarlo.
+- Tre velocità, da scegliere con `SCAN_SPEED` in `scraper/.env` (oppure `--speed`):
+
+  | Profilo | Ciclo | Ricerche per ciclo (a rotazione) | Pausa fra pagine | Pannelli offerte per ciclo |
+  |---|---|---|---|---|
+  | `lento` (default) | 60 min | 8 di 31, 1 pagina | 10–25 s | max 15 |
+  | `normale` | 30 min | 16 di 31, 1 pagina | 6–14 s | max 40 |
+  | `veloce` | 20 min | tutte, 2 pagine | 4–9 s | max 150 |
+
+- Le offerte di un prodotto vengono ricontrollate solo se il prezzo cambia o dopo 6 ore. La sessione (cookie e CAP) resta la stessa fra un ciclo e l'altro.
+- Se Amazon chiede il CAPTCHA o una verifica anti-robot, lo scanner non prova ad aggirarla: si ferma, avvisa su Telegram, scende di una velocità e riprova dopo una pausa che raddoppia a ogni blocco (30, 60, 120… fino a 6 ore). Dopo 6 cicli senza blocchi risale di una velocità, mai oltre `SCAN_SPEED`. Lo stato sta in `scraper/.state.json`.
+- La connessione degli utenti risulta da San Marino: lo scanner imposta da solo il CAP italiano `DELIVERY_ZIP` (default 20121), altrimenti Amazon nasconde prezzi e offerte.
 - Categorie e parole chiave stanno in `scraper/config.py` (`SEARCHES`).
 
 ## Sviluppo

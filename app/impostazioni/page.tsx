@@ -66,6 +66,10 @@ export default function SettingsPage() {
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
               <dt className="text-zinc-500">Ultimo controllo scanner</dt>
               <dd>{ago(scanner.last_check)}</dd>
+              <dt className="text-zinc-500">Database collegato</dt>
+              <dd className="break-all font-mono text-xs leading-5" title="Deve coincidere con SUPABASE_URL in scraper/.env">
+                {scanner.db ?? "—"}
+              </dd>
               <dt className="text-zinc-500">Notifiche browser</dt>
               <dd>
                 {notifyOn ? "attive su questo dispositivo" : (
