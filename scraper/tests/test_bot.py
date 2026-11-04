@@ -91,6 +91,10 @@ def test_top_limit_and_warning_flag():
     assert "Scheda video" in text and "Notebook" not in text
     _, text, _ = bot.handle_update(msg("/top 99"), FakeStore())
     assert "Notebook terzi" in text and "⚠️" in text      # riferimento solo da altri venditori
+    store = FakeStore()
+    store.deals = [deal("B0C", "Notebook terzi", 1200.0, 900.0, 41.0, new_price=None), deal("B0A", "Scheda video", 900.0, 300.0, 45.0)]
+    _, text, _ = bot.handle_update(msg("/top 1"), store)
+    assert "Scheda video" in text and "Notebook" not in text   # i prezzi verificati vengono prima
 
 
 def test_nuove_cerca_fasce():

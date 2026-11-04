@@ -154,7 +154,8 @@ def status_text(store) -> str:
 
 def top_text(store, arg: str = "") -> str:
     n = min(int(arg), LIST_MAX) if arg.isdigit() and int(arg) > 0 else 5
-    live = live_deals(store)[:n]
+    # prima i prezzi verificati, come le card del sito: un riferimento gonfiato non deve stare in cima
+    live = sorted(live_deals(store), key=lambda d: bool(ref_warning(d)))[:n]
     if not live:
         return "Nessuna offerta attiva in questo momento."
     return _deal_list("🏆 <b>Le offerte migliori adesso</b>", live)
