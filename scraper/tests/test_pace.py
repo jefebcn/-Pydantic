@@ -63,3 +63,9 @@ def test_profiles_are_progressively_lighter():
     assert lento["cycle_minutes"] >= normale["cycle_minutes"] >= veloce["cycle_minutes"]
     assert lento["max_offer_fetches"] <= normale["max_offer_fetches"] <= veloce["max_offer_fetches"]
     assert lento["delay_min_s"] >= normale["delay_min_s"] >= veloce["delay_min_s"]
+
+
+def test_scanner_entry_point_imports():
+    """main.py non è coperto dagli altri test: un errore di sintassi fermerebbe lo scanner all'avvio."""
+    from scraper import main
+    assert callable(main.main)

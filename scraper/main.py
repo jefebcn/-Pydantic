@@ -272,6 +272,5 @@ if __name__ == "__main__":
     try:
         main()
     except Exception:
-        log(f"errore fatale:
-{traceback.format_exc()}")
+        log("errore fatale:\n" + traceback.format_exc())
         raise
