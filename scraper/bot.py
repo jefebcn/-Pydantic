@@ -61,10 +61,15 @@ HELP = (
     + "\n\n⚠️ accanto a un'offerta vuol dire che il prezzo del nuovo va verificato: viene da altri venditori "
     "o ne esiste uno più economico, quindi il margine reale può essere più basso.\n"
     "\n<b>Collegare un gruppo</b>\n"
-    "1. Aggiungimi al gruppo (anche come amministratore, se è un canale).\n"
+    "1. Aggiungimi al gruppo.\n"
     "2. Ti scrivo l'ID del gruppo; se no, scrivi /chatid nel gruppo.\n"
     "3. Metti l'ID in <code>TELEGRAM_CHAT_ID</code> in <code>scraper/.env</code> "
-    "(più chat separate da virgola) e riavvia lo scanner."
+    "(più chat separate da virgola) e riavvia lo scanner.\n"
+    "Per un canale pubblico usa <code>TELEGRAM_CHANNEL_ID</code>: riceve solo le offerte con prezzo verificato."
+)
+CHANNEL_DESCRIPTION = (
+    "🔥 Le offerte Amazon Seconda Mano con il margine più alto, appena compaiono.\n"
+    "Margini calcolati con sconto del 22%. I prezzi cambiano: controlla sempre su Amazon prima di comprare."
 )
 
 
@@ -76,7 +81,7 @@ def chat_ref(msg: dict) -> str:
 
 
 def is_linked(chat_id) -> bool:
-    return str(chat_id) in {c for c, _ in parse_chats(config.TELEGRAM_CHAT_ID)}
+    return str(chat_id) in {c for c, _ in parse_chats(config.TELEGRAM_CHAT_ID)} | {config.TELEGRAM_CHANNEL_ID}
 
 
 def command_of(text: str) -> str | None:
@@ -208,7 +213,7 @@ def handle_update(update: dict, store) -> tuple[str, str, int | None] | None:
     if member:
         chat = member["chat"]
         added = member["new_chat_member"]["status"] in ("member", "administrator")
-        if added and chat["type"] in ("group", "supergroup", "channel"):
+        if added and chat["type"] in ("group", "supergroup"):  # in un canale lo leggerebbero tutti gli iscritti
             linked = is_linked(chat["id"])
             return (str(chat["id"]),
                     f"👋 Ciao! Sono <b>{NAME}</b>.\n"
@@ -224,7 +229,7 @@ def handle_update(update: dict, store) -> tuple[str, str, int | None] | None:
     cmd = command_of(msg["text"])
     chat, topic = str(msg["chat"]["id"]), msg.get("message_thread_id") if msg.get("is_topic_message") else None
     if cmd in ("start", "help"):
-        return chat, HELP, topic
+        return None if msg["chat"].get("type") == "channel" else (chat, HELP, topic)  # istruzioni tecniche: non nel canale
     if cmd == "chatid":
         ref = chat_ref(msg)
         state = "✅ già collegata agli avvisi" if is_linked(chat) else "non ancora collegata"
@@ -264,6 +269,9 @@ def set_profile(photo_path=None) -> dict:
         "comandi": ("setMyCommands", {"commands": cmds}),
         "comandi gruppi": ("setMyCommands", {"commands": cmds, "scope": {"type": "all_group_chats"}}),
     }
+    if config.TELEGRAM_CHANNEL_ID:
+        calls["descrizione canale"] = ("setChatDescription", {"chat_id": config.TELEGRAM_CHANNEL_ID,
+                                                              "description": CHANNEL_DESCRIPTION})
     out = {}
     for label, (method, body) in calls.items():
         r = requests.post(f"{base}/{method}", json=body, timeout=20).json()

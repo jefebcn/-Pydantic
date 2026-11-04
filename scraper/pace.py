@@ -36,20 +36,32 @@ def wait_seconds(state: dict, now: float | None = None) -> float:
     return max(0.0, state.get("resume_at", 0) - (time.time() if now is None else now))
 
 
-def on_clean_cycle(state: dict, configured: str) -> bool:
-    """Ciclo senza blocchi: dopo STEP_UP_AFTER_CYCLES cicli puliti risale di un profilo. True se è risalito."""
+def schedule_next(state: dict, minutes: float, now: float | None = None) -> None:
+    """Ricorda quando parte il prossimo giro: un riavvio dello scanner non deve anticiparlo.
+    Una sessione nuova subito dopo un giro prende il blocco di Amazon (503)."""
+    state["next_cycle_at"] = (time.time() if now is None else now) + minutes * 60
+
+
+def cycle_wait(state: dict, now: float | None = None) -> float:
+    """Secondi che mancano al prossimo giro programmato (0 se è ora)."""
+    return max(0.0, state.get("next_cycle_at", 0) - (time.time() if now is None else now))
+
+
+def on_clean_cycle(state: dict, configured: str) -> str | None:
+    """Ciclo senza blocchi: dopo STEP_UP_AFTER_CYCLES cicli puliti risale di un profilo. Il nuovo profilo se è risalito."""
     order = config.SPEED_ORDER
     state["strikes"] = 0
     state.pop("resume_at", None)
     state["clean_cycles"] = state.get("clean_cycles", 0) + 1
     level = current_level(state, configured)
     if order.index(level) < order.index(configured) and state["clean_cycles"] >= config.STEP_UP_AFTER_CYCLES:
-        state["level"] = order[order.index(level) + 1]
+        reached = order[order.index(level) + 1]
+        state["level"] = reached
         state["clean_cycles"] = 0
-        if state["level"] == configured:
+        if reached == configured:
             del state["level"]  # rallentamento finito: si segue di nuovo SCAN_SPEED
-        return True
-    return False
+        return reached
+    return None
 
 
 def next_searches(state: dict, searches: list, per_cycle: int) -> list:

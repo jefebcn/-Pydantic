@@ -21,8 +21,8 @@ def test_clean_cycles_step_back_up_but_not_above_configured():
     for _ in range(config.STEP_UP_AFTER_CYCLES - 1):
         assert not pace.on_clean_cycle(state, "normale")
     assert state["strikes"] == 0
-    assert pace.on_clean_cycle(state, "normale")
-    assert pace.current_level(state, "normale") == "normale"
+    assert pace.on_clean_cycle(state, "normale") == "normale"    # lo scanner lo scrive nel log
+    assert "level" not in state and pace.current_level(state, "normale") == "normale"
     for _ in range(config.STEP_UP_AFTER_CYCLES * 2):
         assert not pace.on_clean_cycle(state, "normale")
     assert pace.current_level(state, "normale") == "normale"
@@ -35,6 +35,14 @@ def test_pause_survives_restart_and_clears_after_clean_cycle():
     assert pace.wait_seconds(state, now=1000.0 + pause * 60 + 1) == 0
     pace.on_clean_cycle(state, "normale")
     assert "resume_at" not in state and pace.wait_seconds(state) == 0
+
+
+def test_restart_does_not_bring_the_next_cycle_forward():
+    state: dict = {}
+    assert pace.cycle_wait(state, now=1000.0) == 0              # mai girato: parte subito
+    pace.schedule_next(state, 60, now=1000.0)
+    assert pace.cycle_wait(state, now=1000.0) == 3600           # lo stato salvato vale anche dopo un riavvio
+    assert pace.cycle_wait(state, now=1000.0 + 3601) == 0
 
 
 def test_raising_scan_speed_applies_at_once_without_blocks():

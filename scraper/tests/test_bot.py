@@ -139,3 +139,13 @@ def test_welcome_when_added_to_group():
     assert chat == "-100555" and "<code>-100555</code>" in text
     upd["my_chat_member"]["new_chat_member"]["status"] = "left"
     assert bot.handle_update(upd, FakeStore()) is None
+
+
+def test_public_channel_gets_no_setup_instructions(monkeypatch):
+    monkeypatch.setattr(config, "TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(config, "TELEGRAM_CHANNEL_ID", "-100777")
+    chat = {"id": -100777, "type": "channel"}
+    added = {"my_chat_member": {"chat": chat, "new_chat_member": {"status": "administrator"}, "date": 0}}
+    assert bot.handle_update(added, FakeStore()) is None
+    assert bot.handle_update({"channel_post": {"chat": chat, "text": "/start"}}, FakeStore()) is None
+    assert bot.is_linked(-100777) and bot.is_linked(111) and not bot.is_linked(555)

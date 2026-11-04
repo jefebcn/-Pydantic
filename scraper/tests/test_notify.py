@@ -1,8 +1,8 @@
 """Test del formato degli avvisi Telegram (scraper/notify.py)."""
 from scraper import config
 from scraper import notify
-from scraper.notify import (CAPTION_MAX, big_image, deal_buttons, eur, format_deal, is_new_low, margin_bar,
-                            ref_warning, send_deal)
+from scraper.notify import (CAPTION_MAX, big_image, channel_wants, deal_buttons, eur, format_deal, is_new_low,
+                            is_quiet_hour, ref_warning, send_channel, send_deal)
 
 DEAL = {
     "asin": "B0TEST0001", "title": "Apple iPhone 18 Pro 512 GB <Titanio>", "category": "Smartphone",
@@ -23,8 +23,8 @@ def test_format_deal_caption():
     assert text.startswith("💡 <b>MARGINE 29%</b>")
     assert "+500 €" in text
     assert "&lt;Titanio&gt;" in text            # titolo con caratteri HTML escapati
-    assert "Usato Come nuovo · Smartphone" in text
-    assert "Tuo costo -22%" in text and "1.239,44 €" in text and "1.739,00 €" in text
+    assert "📦 Usato: Come nuovo" in text and "#Smartphone" in text
+    assert "Con sconto 22%: <b>1.239,44 €</b>" in text and "<s>1.739,00 €</s>" in text
     assert "<a " not in text                    # niente link nel testo: niente anteprima in fondo
     assert len(text) <= CAPTION_MAX
     assert format_deal({**DEAL, "margin_pct": 61}, 22).startswith("🚀")
@@ -36,7 +36,6 @@ def test_buttons_and_helpers(monkeypatch):
     assert amazon["url"] == "https://www.amazon.it/dp/B0TEST0001"
     assert dash["url"] == "https://pydantic.vercel.app/offerte"
     assert eur(1234.5) == "1.234,50 €" and eur(None) == "—"
-    assert margin_bar(61) == "▰▰▰▰▰▰▱▱▱▱"
 
 
 def test_reference_warning():
@@ -55,7 +54,74 @@ def test_alert_again_only_when_price_really_drops():
     assert not is_new_low(99.5, 100.0)           # pochi centesimi: non vale un altro messaggio
     assert is_new_low(99.0, 100.0)
     text = format_deal(DEAL, 22, previous=1700.0)
-    assert "📉 <b>Prezzo sceso</b> da 1.700,00 €" in text
+    assert "📉 <b>Prezzo sceso</b> da <s>1.700,00 €</s>" in text
+
+
+VERIFIED = {**DEAL, "new_price": 1739.0, "new_price_any": 1739.0}
+
+
+def test_channel_publishes_only_verified_deals_without_repeats(monkeypatch):
+    monkeypatch.setattr(config, "TELEGRAM_CHANNEL_ID", "-100777")
+    now, day = 1_000_000_000.0, 86400
+    assert channel_wants(VERIFIED, 1589.0, None, now)
+    assert not channel_wants({**VERIFIED, "new_price": None}, 1589.0, None, now)     # riferimento dubbio
+    recent = {"price": 1589.0, "ts": now - day}
+    assert not channel_wants(VERIFIED, 1589.0, recent, now)                          # già uscita
+    assert not channel_wants(VERIFIED, 1700.0, recent, now)                          # è risalita
+    assert channel_wants(VERIFIED, 1500.0, recent, now)                              # è scesa davvero
+    assert channel_wants(VERIFIED, 1589.0, {"price": 1589.0, "ts": now - 8 * day}, now)  # dopo una settimana
+    monkeypatch.setattr(config, "TELEGRAM_CHANNEL_ID", "")
+    assert not channel_wants(VERIFIED, 1589.0, None, now)                            # canale non configurato
+
+
+def test_channel_post_has_card_and_no_triage_buttons(monkeypatch):
+    uploads = []
+    monkeypatch.setattr(config, "TELEGRAM_CHANNEL_ID", "-100777")
+    monkeypatch.setattr(config, "DASHBOARD_URL", "https://pydantic.vercel.app")
+    monkeypatch.setattr(notify, "deal_card", lambda *a: b"jpeg")
+    monkeypatch.setattr(notify, "upload_photo", lambda chat, jpeg, payload, topic=None: uploads.append((chat, jpeg, payload)) or True)
+    assert send_channel(VERIFIED, 22)
+    (chat, jpeg, payload), = uploads
+    assert chat == "-100777" and jpeg == b"jpeg" and "MARGINE" in payload["caption"]
+    [[amazon, site]] = payload["reply_markup"]["inline_keyboard"]
+    assert amazon["url"].endswith("/dp/B0TEST0001") and site["text"] == "📊 Tutte le offerte"
+
+
+def test_service_messages_never_reach_the_channel(monkeypatch):
+    chats = []
+    monkeypatch.setattr(config, "TELEGRAM_CHAT_ID", "111")
+    monkeypatch.setattr(config, "TELEGRAM_CHANNEL_ID", "-100777")
+    monkeypatch.setattr(notify, "post", lambda method, chat, payload, topic=None: chats.append(chat) or True)
+    assert notify.telegram("⚠️ Amazon ha chiesto la verifica")
+    assert chats == ["111"]
+
+
+def test_quiet_hours():
+    assert is_quiet_hour(23) and is_quiet_hour(3) and not is_quiet_hour(8) and not is_quiet_hour(22)
+
+
+def test_card_is_a_jpeg_and_long_titles_stay_inside():
+    import io
+
+    from PIL import Image
+
+    from scraper.card import H, W, clean_title, render_card
+    assert clean_title("Drone ＜249 g 🚀  con Gimbal") == "Drone <249 g con Gimbal"
+    photo = io.BytesIO()
+    Image.new("RGB", (40, 90), "red").save(photo, "PNG")
+    long = {**DEAL, "title": "Titolo molto lungo " * 30, "used_price": 123456.78, "ref_price": 234567.89, "profit_eur": 99999}
+    out = render_card(long, 22, photo.getvalue(), previous=130000.0)
+    img = Image.open(io.BytesIO(out))
+    assert img.format == "JPEG" and img.size == (W, H)
+
+
+def test_card_problem_does_not_lose_the_alert(monkeypatch):
+    def broken(*a, **k):
+        raise OSError("rete giù")
+
+    monkeypatch.setattr(notify.requests, "get", broken)
+    assert notify.deal_card({**DEAL, "image_url": "https://x/a.jpg"}, 22) is None
+    assert notify.deal_card(DEAL, 22) is None                                        # prodotto senza foto
 
 
 def test_group_gets_no_triage_buttons_and_photo_falls_back_to_text(monkeypatch):
@@ -66,6 +132,7 @@ def test_group_gets_no_triage_buttons_and_photo_falls_back_to_text(monkeypatch):
         return method == "sendMessage"             # la foto fallisce, il testo passa
 
     monkeypatch.setattr(notify, "post", fake_post)
+    monkeypatch.setattr(notify, "deal_card", lambda *a: None)
     monkeypatch.setattr(config, "TELEGRAM_CHAT_ID", "111,-1009:7")
     assert send_deal({**DEAL, "image_url": "https://x/a.jpg"}, 22)
     assert [(c[0], c[1]) for c in calls] == [("sendPhoto", "111"), ("sendMessage", "111"),

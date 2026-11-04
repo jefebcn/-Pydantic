@@ -4,7 +4,7 @@ Uso (dalla cartella del progetto):
     python -m scraper.main              # gira per sempre, al ritmo di SCAN_SPEED (default lento), una sola istanza
     python -m scraper.main --speed normale     # profilo massimo diverso (lento | normale | veloce)
     python -m scraper.main --once       # un solo ciclo
-    python -m scraper.main --telegram-setup    # nome, foto, biografia e comandi del bot Telegram
+    python -m scraper.main --telegram-setup    # nome, foto, biografia e comandi del bot, descrizione del canale
     python -m scraper.main --test B0XXXXXXXX   # prova un ASIN, stampa le offerte (non salva nulla)
     python -m scraper.main --search notebook   # prova una ricerca (non salva nulla)
     aggiungi --debug per salvare l'HTML scaricato in scraper/debug/
@@ -26,7 +26,7 @@ from pathlib import Path
 
 from . import bot, config, pace
 from .amazon import AmazonClient, CaptchaError, LocationError, SearchItem
-from .notify import is_new_low, send_deal, telegram
+from .notify import channel_wants, is_new_low, send_channel, send_deal, telegram
 
 ALREADY_RUNNING = 3            # codice di uscita: avvia-scanner.bat non riparte
 INSTANCE_PORT = 47853          # porta locale tenuta occupata finché lo scanner gira
@@ -91,6 +91,27 @@ def save_state(state: dict) -> None:
     write_json(config.STATE_FILE, state)
 
 
+def load_published() -> dict:
+    try:
+        return json.loads(config.PUBLISHED_FILE.read_text())
+    except (FileNotFoundError, json.JSONDecodeError):
+        return {}
+
+
+def publish_to_channel(d: dict, price: float, discount: float) -> bool:
+    """Pubblica nel canale se è il caso e ricorda cosa è uscito. True se il post è partito."""
+    published = load_published()
+    last = published.get(d["asin"])
+    if not channel_wants(d, price, last, time.time()):
+        return False
+    previous = last["price"] if last and price < last["price"] else None
+    if not send_channel(d, discount, previous):
+        return False
+    published[d["asin"]] = {"price": price, "ts": time.time()}
+    write_json(config.PUBLISHED_FILE, published)
+    return True
+
+
 def needs_check(item: SearchItem, cache: dict) -> bool:
     c = cache.get(item.asin)
     if not c:
@@ -127,7 +148,7 @@ def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
     todo = todo[:prof["max_offer_fetches"]]
     log(f"{len(found)} prodotti trovati, controllo offerte su {len(todo)}")
 
-    alerts = 0
+    alerts = posts = 0
     for it, _cat in todo:
         try:
             summary = client.offers(it.asin)
@@ -154,8 +175,9 @@ def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
             if is_new_low(used_price, floor) and send_deal(d, discount, previous=floor):  # senza Telegram non segna nulla
                 alerts += 1
                 store.mark_alerted(it.asin, used_price)
+            posts += publish_to_channel(d, used_price, discount)
 
-    log(f"ciclo finito: {alerts} avvisi inviati")
+    log(f"ciclo finito: {alerts} avvisi inviati, {posts} post nel canale")
 
 
 def cmd_test(asin: str) -> None:
@@ -225,6 +247,10 @@ def main() -> None:
         f"attuale '{pace.current_level(state, configured)}'")
     client = None  # stessa sessione (cookie + CAP) per più cicli, come un visitatore normale
     while True:
+        pending = pace.cycle_wait(state)
+        if pending and not a.once:  # anche dopo un riavvio: il giro non si anticipa
+            log(f"prossimo ciclo alle {datetime.fromtimestamp(state['next_cycle_at']):%H:%M}")
+            time.sleep(pending)
         level = pace.current_level(state, configured)
         prof = config.profile(level)
         if client is None:
@@ -257,13 +283,13 @@ def main() -> None:
             log(f"errore: {e!r}")
             client = None
         else:
-            if pace.on_clean_cycle(state, configured):
-                log(f"{config.STEP_UP_AFTER_CYCLES} cicli senza blocchi: velocità '{state['level']}'")
+            reached = pace.on_clean_cycle(state, configured)
+            if reached:
+                log(f"{config.STEP_UP_AFTER_CYCLES} cicli senza blocchi: velocità '{reached}'")
+        pace.schedule_next(state, prof["cycle_minutes"])
         save_state(state)
         if a.once:
             return
-        log(f"prossimo ciclo tra {prof['cycle_minutes']} min")
-        time.sleep(prof["cycle_minutes"] * 60)
 
 
 if __name__ == "__main__":
