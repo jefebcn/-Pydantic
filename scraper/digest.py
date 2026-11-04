@@ -9,7 +9,7 @@ import requests
 
 from . import config
 from .bot import live_deals
-from .notify import big_image, bot_link, eur, hunter_score, post, ref_warning, upload_photo, is_quiet_hour
+from .notify import QUIET_HOURS, big_image, bot_link, eur, hunter_score, out_url, post, ref_warning, upload_photo
 
 DIGEST_HOUR = 19     # dalle 19 in poi, al primo giro finito
 MIN_DEALS = 2        # con una sola offerta non è un riepilogo
@@ -19,7 +19,8 @@ MONTHS = ("gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio"
 
 
 def due(state: dict, now: datetime) -> bool:
-    return bool(config.TELEGRAM_CHANNEL_ID) and now.hour >= DIGEST_HOUR and state.get("digest_date") != now.date().isoformat()
+    in_time = DIGEST_HOUR <= now.hour < QUIET_HOURS[0]  # di notte il canale tace: se è tardi, salta
+    return bool(config.TELEGRAM_CHANNEL_ID) and in_time and state.get("digest_date") != now.date().isoformat()
 
 
 def pick(live: list[dict], published: dict, now: float) -> list[dict]:
@@ -33,7 +34,7 @@ def caption(deals: list[dict], discount: float) -> str:
     lines = ["🏆 <b>Il meglio di oggi</b>", ""]
     for medal, d in zip(medals, deals):
         title = html.escape((d.get("title") or d["asin"])[:60])
-        lines.append(f"{medal} <a href=\"{config.BASE_URL}/dp/{d['asin']}\">{title}</a>\n"
+        lines.append(f"{medal} <a href=\"{out_url(d['asin'], 'riepilogo')}\">{title}</a>\n"
                      f"    <b>+{eur(d['profit_eur'], 0)}</b> · {float(d['margin_pct']):.0f}% · Voto {hunter_score(d)}")
     lines += ["", f"Guadagni calcolati con sconto {discount:.0f}%. I prezzi cambiano: controlla su Amazon prima di comprare."]
     return "\n".join(lines)
@@ -58,9 +59,8 @@ def post_digest(store, published: dict) -> bool:
     if config.DASHBOARD_URL:
         rows.insert(0, [{"text": "📊 Tutte le offerte", "url": f"{config.DASHBOARD_URL.rstrip('/')}/offerte"}])
     discount = float(store.settings().get("discount_pct", config.DISCOUNT_PCT))
-    extra = {"caption": caption(deals, discount),"reply_markup": {"inline_keyboard": rows},
-             "disable_notification": is_quiet_hour(now.hour)}
+    extra = {"caption": caption(deals, discount), "reply_markup": {"inline_keyboard": rows}}
     image = render_digest(deals, photos, f"{now.day} {MONTHS[now.month - 1]}")
-    return upload_photo(config.TELEGRAM_CHANNEL_ID, image, extra) or post(
+    return bool(upload_photo(config.TELEGRAM_CHANNEL_ID, image, extra) or post(
         "sendMessage", config.TELEGRAM_CHANNEL_ID,
-        {"text": extra["caption"], "reply_markup": extra["reply_markup"], "link_preview_options": {"is_disabled": True}})
+        {"text": extra["caption"], "reply_markup": extra["reply_markup"], "link_preview_options": {"is_disabled": True}}))

@@ -26,7 +26,7 @@ from pathlib import Path
 
 from . import bot, config, digest, pace, subscribers
 from .amazon import AmazonClient, CaptchaError, LocationError, SearchItem
-from .notify import channel_wants, is_new_low, parse_chats, send_channel, send_deal, telegram
+from .notify import channel_edit_needed, channel_next, edit_channel_post, is_new_low, parse_chats, send_channel, send_deal, telegram
 
 ALREADY_RUNNING = 3            # codice di uscita: avvia-scanner.bat non riparte
 INSTANCE_PORT = 47853          # porta locale tenuta occupata finché lo scanner gira
@@ -98,18 +98,37 @@ def load_published() -> dict:
         return {}
 
 
-def publish_to_channel(d: dict, price: float, discount: float) -> bool:
-    """Pubblica nel canale se è il caso e ricorda cosa è uscito. True se il post è partito."""
+def publish_to_channel(store, discount: float, min_margin: float, min_profit: float) -> bool:
+    """Pubblica la migliore offerta pronta, se il ritmo del canale lo consente, e ricorda cosa è uscito.
+    Le altre restano in attesa: alla prossima occasione si riparte dalla migliore."""
     published = load_published()
+    now = datetime.now()
+    d = channel_next(bot.live_deals(store), published, now.timestamp(), now.hour, min_margin, min_profit)
+    if not d:
+        return False
+    price = float(d["used_price"])
     last = published.get(d["asin"])
-    if not channel_wants(d, price, last, time.time()):
-        return False
     previous = last["price"] if last and price < last["price"] else None
-    if not send_channel(d, discount, previous):
+    checked = datetime.fromisoformat(d["checked_at"].replace("Z", "+00:00")).astimezone()
+    sent = send_channel(d, discount, previous, f"Controllato alle {checked:%H:%M}")
+    if not sent:
         return False
-    published[d["asin"]] = {"price": price, "ts": time.time()}
+    published[d["asin"]] = {"price": price, "ts": now.timestamp(),
+                            **({"message_id": sent} if sent is not True else {})}
     write_json(config.PUBLISHED_FILE, published)
     return True
+
+
+def refresh_channel_post(d: dict, price: float, discount: float) -> None:
+    """Se il prezzo di un'offerta già pubblicata cambia, il post lo dice."""
+    published = load_published()
+    last = published.get(d["asin"])
+    if not last or not last.get("message_id") or not channel_edit_needed(last, price):
+        return
+    if edit_channel_post(last["message_id"], d, discount, last["price"], price):
+        last["shown"] = price
+        write_json(config.PUBLISHED_FILE, published)
+        log(f"  {d['asin']}: post del canale aggiornato, prezzo {price}€")
 
 
 def needs_check(item: SearchItem, cache: dict) -> bool:
@@ -148,7 +167,7 @@ def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
     todo = todo[:prof["max_offer_fetches"]]
     log(f"{len(found)} prodotti trovati, controllo offerte su {len(todo)}")
 
-    alerts = posts = personal = 0
+    alerts = personal = 0
     linked = {chat for chat, _ in parse_chats(config.TELEGRAM_CHAT_ID)}
     for it, _cat in todo:
         try:
@@ -169,6 +188,7 @@ def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
             continue
         margin, profit = float(d["margin_pct"]), float(d["profit_eur"])
         log(f"  {it.asin} usato {used_price}€ | nuovo {d['ref_price']}€ | margine {margin:.0f}% (+{profit:.0f}€)")
+        refresh_channel_post(d, used_price, discount)
         if d.get("triage") in ("ignorato", "acquistato"):
             continue
         above = margin >= min_margin and profit >= min_profit
@@ -177,13 +197,13 @@ def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
             if is_new_low(used_price, floor) and send_deal(d, discount, previous=floor):  # senza Telegram non segna nulla
                 alerts += 1
                 store.mark_alerted(it.asin, used_price)
-            posts += publish_to_channel(d, used_price, discount)
         try:  # chi riceve già tutti gli avvisi sopra soglia non li riceve due volte
             personal += subscribers.dispatch(d, used_price, discount, min_profit, skip=linked if above else ())
         except Exception as e:
             log(f"  {it.asin}: errore negli avvisi su misura ({e!r})")
 
-    log(f"ciclo finito: {alerts} avvisi inviati, {posts} post nel canale, {personal} avvisi su misura")
+    posts = publish_to_channel(store, discount, min_margin, min_profit)
+    log(f"ciclo finito: {alerts} avvisi inviati, {int(posts)} post nel canale, {personal} avvisi su misura")
 
 
 def cmd_test(asin: str) -> None:

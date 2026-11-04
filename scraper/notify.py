@@ -16,7 +16,13 @@ RETRY_MAX_S = 60     # attesa massima quando Telegram chiede di rallentare (HTTP
 NEW_LOW_DROP = 0.01  # entro 24 ore si riavvisa solo se il prezzo scende almeno dell'1%
 CHEAPER_NEW = 0.95   # un nuovo di altri venditori sotto il 95% del prezzo Amazon rende il riferimento dubbio
 CHANNEL_REPOST_DAYS = 7     # il canale ripropone un'offerta già pubblicata solo dopo una settimana o se cala
-QUIET_HOURS = (23, 8)       # di notte i post del canale arrivano senza suono
+QUIET_HOURS = (23, 8)       # di notte il canale non pubblica e gli avvisi personali arrivano senza suono
+# Il canale deve restare una selezione: un post alla volta, il migliore disponibile
+CHANNEL_MIN_SCORE = 60      # Voto Hunter minimo
+CHANNEL_DAILY_MAX = 12      # post in 24 ore
+CHANNEL_GAP_MIN = 45        # minuti fra un post e l'altro…
+CHANNEL_URGENT_SCORE = 90   # …che non valgono per un affare eccezionale: si esaurisce in fretta
+CHANNEL_FRESH_HOURS = 6     # oltre questo tempo dall'ultimo controllo il prezzo non è più affidabile
 # Voto Hunter, 0-100 (come hunterScore in lib/format.ts): margine fino a 50 punti, guadagno fino a 30, condizioni fino a 20
 SCORE_MARGIN_FULL = 60      # margine % che vale tutti i punti
 SCORE_PROFIT_FULL = 300     # guadagno in € che vale tutti i punti
@@ -53,15 +59,11 @@ def api(method: str, **kw) -> dict | None:
         return None
 
 
-def _request(method: str, **kw) -> bool:
-    return api(method, **kw) is not None
+def call(method: str, body: dict) -> dict | None:
+    return api(method, json=body)
 
 
-def call(method: str, body: dict) -> bool:
-    return _request(method, json=body)
-
-
-def post(method: str, chat: str, payload: dict, topic: int | None = None) -> bool:
+def post(method: str, chat: str, payload: dict, topic: int | None = None) -> dict | None:
     """Una chiamata alla Bot API verso una chat."""
     body = {"chat_id": chat, "parse_mode": "HTML", **payload}
     if topic:
@@ -69,13 +71,13 @@ def post(method: str, chat: str, payload: dict, topic: int | None = None) -> boo
     return call(method, body)
 
 
-def upload_photo(chat: str, jpeg: bytes, payload: dict, topic: int | None = None) -> bool:
+def upload_photo(chat: str, jpeg: bytes, payload: dict, topic: int | None = None) -> dict | None:
     """sendPhoto con un'immagine generata qui invece di un link."""
     data = {"chat_id": chat, "parse_mode": "HTML", **payload}
     if topic:
         data["message_thread_id"] = topic
     data = {k: json.dumps(v) if isinstance(v, (dict, bool)) else v for k, v in data.items()}
-    return _request("sendPhoto", data=data, files={"photo": ("offerta.jpg", jpeg, "image/jpeg")})
+    return api("sendPhoto", data=data, files={"photo": ("offerta.jpg", jpeg, "image/jpeg")})
 
 
 def telegram(text: str, buttons: list | None = None) -> bool:
@@ -101,10 +103,10 @@ def deal_card(d: dict, discount_pct: float, previous: float | None = None) -> by
         return None
 
 
-def _deliver(chat: str, topic: int | None, d: dict, caption: str, card: bytes | None, extra: dict) -> bool:
-    """Prima la card, poi la foto Amazon, infine solo il testo."""
+def _deliver(chat: str, topic: int | None, d: dict, caption: str, card: bytes | None, extra: dict):
+    """Prima la card, poi la foto Amazon, infine solo il testo. La risposta di Telegram, o None se non è partito."""
     photo = big_image(d.get("image_url"))
-    return bool(
+    return (
         (card and upload_photo(chat, card, {"caption": caption[:CAPTION_MAX], **extra}, topic))
         or (photo and post("sendPhoto", chat, {"photo": photo, "caption": caption[:CAPTION_MAX], **extra}, topic))
         or post("sendMessage", chat, {"text": caption, "link_preview_options": {"is_disabled": True}, **extra}, topic)
@@ -120,13 +122,13 @@ def send_deal(d: dict, discount_pct: float, previous: float | None = None) -> bo
     for chat, topic in parse_chats(config.TELEGRAM_CHAT_ID):
         # in un gruppo chiunque potrebbe premere: ★ e ✕ si danno solo nelle chat private collegate
         markup = {"inline_keyboard": deal_buttons(d, triage=not chat.startswith("-"))}
-        sent = _deliver(chat, topic, d, caption, card, {"reply_markup": markup}) or sent
+        sent = bool(_deliver(chat, topic, d, caption, card, {"reply_markup": markup})) or sent
     return sent
 
 
 def send_personal(chat: str, d: dict, caption: str, card: bytes | None, rows: list, silent: bool) -> bool:
     """Avviso su misura a una persona che usa il bot."""
-    return _deliver(chat, None, d, caption, card, {"reply_markup": {"inline_keyboard": rows}, "disable_notification": silent})
+    return bool(_deliver(chat, None, d, caption, card, {"reply_markup": {"inline_keyboard": rows}, "disable_notification": silent}))
 
 
 def fresh_or_lower(price: float, last: dict | None, now: float) -> bool:
@@ -144,17 +146,60 @@ def channel_wants(d: dict, price: float, published: dict | None, now: float) -> 
     return fresh_or_lower(price, published, now)
 
 
+def channel_next(deals: list[dict], published: dict, now: float, hour: int, min_margin: float, min_profit: float) -> dict | None:
+    """La prossima offerta da pubblicare: la migliore fra quelle pronte, nel rispetto del ritmo del canale."""
+    if is_quiet_hour(hour):
+        return None
+    recent = [v["ts"] for v in published.values() if now - v["ts"] < 86400]
+    if len(recent) >= CHANNEL_DAILY_MAX:
+        return None
+    ready = [d for d in deals
+             if hunter_score(d) >= CHANNEL_MIN_SCORE
+             and float(d["margin_pct"]) >= min_margin and float(d["profit_eur"]) >= min_profit
+             and now - datetime.fromisoformat(d["checked_at"].replace("Z", "+00:00")).timestamp() < CHANNEL_FRESH_HOURS * 3600
+             and channel_wants(d, float(d["used_price"]), published.get(d["asin"]), now)]
+    best = max(ready, key=hunter_score, default=None)
+    if best and hunter_score(best) < CHANNEL_URGENT_SCORE and now - max(recent, default=0) < CHANNEL_GAP_MIN * 60:
+        return None
+    return best
+
+
+def channel_edit_needed(last: dict, price: float) -> bool:
+    """Il post già uscito va corretto? Sì se il prezzo è salito rispetto al post o se torna al suo posto.
+    Se scende sotto il prezzo del post non serve: si ripubblica."""
+    shown = last.get("shown", last["price"])
+    if abs(price - shown) < shown * NEW_LOW_DROP:
+        return False
+    return price > last["price"] or shown > last["price"]
+
+
+def edit_channel_post(message_id: int, d: dict, discount_pct: float, posted: float, price: float) -> bool:
+    """Chi apre il canale dopo non deve trovare un prezzo che non vale più."""
+    note = f"⚠️ <b>Prezzo salito</b>: nel post era {eur(posted)}, ora {eur(price)}\n\n" if price > posted else ""
+    caption = note + format_deal(d, discount_pct)
+    return bool(call("editMessageCaption", {"chat_id": config.TELEGRAM_CHANNEL_ID, "message_id": message_id, "parse_mode": "HTML",
+                                            "caption": caption[:CAPTION_MAX], "reply_markup": {"inline_keyboard": _channel_rows(d)}}))
+
+
 def is_quiet_hour(hour: int) -> bool:
     start, end = QUIET_HOURS
     return hour >= start or hour < end
 
 
-def send_channel(d: dict, discount_pct: float, previous: float | None = None) -> bool:
-    """Post nel canale pubblico TELEGRAM_CHANNEL_ID: card, didascalia e pulsanti, senza ☆ e ✕."""
-    rows = deal_buttons(d) + [[{"text": "🔔 Avvisami se il prezzo scende", "url": bot_link(f"w_{d['asin']}")}]]
-    extra = {"reply_markup": {"inline_keyboard": rows}, "disable_notification": is_quiet_hour(datetime.now().hour)}
-    return _deliver(config.TELEGRAM_CHANNEL_ID, None, d, format_deal(d, discount_pct, previous),
-                    deal_card(d, discount_pct, previous), extra)
+def _channel_rows(d: dict) -> list:
+    return deal_buttons(d, source="canale") + [[{"text": "🔔 Avvisami se il prezzo scende", "url": bot_link(f"w_{d['asin']}")}]]
+
+
+def send_channel(d: dict, discount_pct: float, previous: float | None = None, checked: str | None = None) -> int | bool:
+    """Post nel canale pubblico TELEGRAM_CHANNEL_ID: card, didascalia e pulsanti, senza ☆ e ✕.
+    Il numero del messaggio, per poterlo correggere dopo; False se non è partito."""
+    extra = {"reply_markup": {"inline_keyboard": _channel_rows(d)}}
+    res = _deliver(config.TELEGRAM_CHANNEL_ID, None, d, format_deal(d, discount_pct, previous, checked),
+                   deal_card(d, discount_pct, previous), extra)
+    if not res:
+        return False
+    result = res.get("result") if isinstance(res, dict) else None
+    return result["message_id"] if isinstance(result, dict) and "message_id" in result else True
 
 
 def is_new_low(price: float, floor: float | None) -> bool:
@@ -236,8 +281,15 @@ def deal_url(asin: str) -> str:
     return f"{config.DASHBOARD_URL.rstrip('/')}/offerte/{asin}"
 
 
-def deal_buttons(d: dict, triage: bool = False) -> list:
-    row = [{"text": "🛒 Apri su Amazon", "url": f"{config.BASE_URL}/dp/{d['asin']}"}]
+def out_url(asin: str, source: str) -> str:
+    """Link ad Amazon. Passa dal sito, che conta il clic e la sua provenienza; senza sito va diretto."""
+    if config.DASHBOARD_URL:
+        return f"{config.DASHBOARD_URL.rstrip('/')}/vai/{asin}?da={source}"
+    return f"{config.BASE_URL}/dp/{asin}"
+
+
+def deal_buttons(d: dict, triage: bool = False, source: str = "avviso") -> list:
+    row = [{"text": "🛒 Apri su Amazon", "url": out_url(d["asin"], source)}]
     if config.DASHBOARD_URL:
         row.append({"text": "📊 Analisi completa", "url": deal_url(d["asin"])})
     return [row, triage_row(d["asin"])] if triage else [row]

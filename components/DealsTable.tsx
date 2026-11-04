@@ -8,7 +8,7 @@ import { useData } from "./DataProvider";
 import { InventoryModal } from "./InventoryModal";
 import { ScoreBadge } from "./Score";
 import type { Deal, InventoryInput } from "@/lib/types";
-import { ago, amazonUrl, byPriceBand, eur, marginTone, refIssue, shortCondition } from "@/lib/format";
+import { ago, byPriceBand, outUrl, eur, marginTone, refIssue, shortCondition } from "@/lib/format";
 
 function TriageBadge({ d }: { d: Deal }) {
   if (d.triage === "interessante") return <Badge tone="amber">★ Interessante</Badge>;
@@ -47,7 +47,7 @@ export function Actions({ d, onBuy, amazon = true }: { d: Deal; onBuy: () => voi
         </>
       )}
       {amazon && (
-        <a href={amazonUrl(d.asin)} target="_blank" rel="noreferrer"
+        <a href={outUrl(d.asin)} target="_blank" rel="noreferrer"
           className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full bg-ink px-3 text-xs font-semibold text-white hover:bg-ink/85">
           Amazon <IconArrowUpRight size={13} />
         </a>

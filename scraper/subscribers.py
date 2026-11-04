@@ -1,7 +1,8 @@
 """Chi usa il bot in privato: avvisi su misura e prodotti seguiti. Solo su questo PC, in scraper/.subscribers.json.
 
 {chat: {"on": bool, "cats": [categorie, vuoto = tutte], "max": budget o None, "margin": min %,
-        "sent": {asin: {"price", "ts"}}, "watch": {asin: prezzo a cui avvisare sotto}}}
+        "sent": {asin: {"price", "ts"}}, "watch": {asin: prezzo a cui avvisare sotto},
+        "first", "last": prima e ultima volta che ha usato il bot, "premium": risposta alla domanda sul prezzo}}
 """
 from __future__ import annotations
 
@@ -20,6 +21,7 @@ MARGIN_CHOICES = (30, 40, 50, 60)
 BUDGET_CHOICES = (400, 650, 1000, 1600)
 DAILY_MAX = 15       # avvisi su misura al giorno per persona: oltre diventano rumore
 WATCH_MAX = 30       # prodotti seguiti per persona
+PREMIUM_CHOICES = (5, 15, 0)   # quanto pagherebbe al mese, 0 = niente: si chiede prima di costruire qualcosa
 KEEP_SENT_DAYS = 8   # oltre la finestra di ripubblicazione non servono più
 
 _lock = threading.RLock()
@@ -60,6 +62,25 @@ def update(chat, change) -> dict:
         data[str(chat)] = sub
         _save(data)
         return sub
+
+
+def touch(chat) -> None:
+    """Ricorda che la persona usa il bot (per contare chi è attivo). Una scrittura all'ora basta."""
+    now = time.time()
+    if now - get(chat).get("last", 0) > 3600:
+        update(chat, lambda sub: sub.update(first=sub.get("first", now), last=now))
+
+
+def usage(now: float) -> dict:
+    """I numeri che servono per capire se il bot piace, senza dati personali."""
+    with _lock:
+        subs = [{**_blank(), **s} for s in _load().values()]
+    answers = [s["premium"] for s in subs if s.get("premium") is not None]
+    return {"people": len(subs),
+            "active": sum(1 for s in subs if now - s.get("last", 0) < 7 * 86400),
+            "alerts_on": sum(1 for s in subs if s["on"]),
+            "watching": sum(len(s["watch"]) for s in subs),
+            "premium": {price: answers.count(price) for price in PREMIUM_CHOICES}}
 
 
 def forget(chat) -> None:

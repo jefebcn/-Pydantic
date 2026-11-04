@@ -10,7 +10,7 @@ import { IconArrowUpRight, IconSend } from "./icons";
 import { Badge, Button, Empty, PageHeader, Skeleton, inputCls } from "./ui";
 import { ScoreBadge, ScoreRing } from "./Score";
 import type { Deal, InventoryInput, PricePoint } from "@/lib/types";
-import { ago, amazonUrl, bigImage, botLink, eur, hunterScore, pct, refIssue, scoreLabel, scoreParts, shortCondition } from "@/lib/format";
+import { ago, bigImage, botLink, eur, hunterScore, outUrl, pct, refIssue, scoreLabel, scoreParts, shortCondition } from "@/lib/format";
 
 const RESALE_PRESETS = [0.9, 0.8, 0.7];
 
@@ -228,7 +228,7 @@ export function DealDetail({ asin }: { asin: string }) {
             {image ? <img src={image} alt={d.title || ""} className="max-h-full max-w-full object-contain lg:max-h-[420px]" /> : <span className="text-4xl">📦</span>}
           </div>
           <div className="mt-4 grid gap-2">
-            <a href={amazonUrl(d.asin)} target="_blank" rel="noreferrer"
+            <a href={outUrl(d.asin)} target="_blank" rel="noreferrer"
               className="inline-flex h-11 items-center justify-center gap-1.5 rounded-full bg-ink text-sm font-semibold text-white hover:bg-ink/85">
               Apri su Amazon <IconArrowUpRight size={15} />
             </a>

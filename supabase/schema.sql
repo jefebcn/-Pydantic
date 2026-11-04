@@ -151,6 +151,17 @@ SELECT i.*,
 FROM inventory i;
 
 
+-- ── 7b. CLIC verso Amazon: quante persone aprono le offerte e da dove ─
+-- Nessun dato personale: solo prodotto, provenienza e ora.
+CREATE TABLE IF NOT EXISTS clicks (
+  id          BIGSERIAL PRIMARY KEY,
+  asin        TEXT NOT NULL,
+  source      TEXT NOT NULL,
+  clicked_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_clicks_time ON clicks (clicked_at DESC);
+
+
 -- ── 8. SICUREZZA ────────────────────────────────────────────────────
 -- Nessun accesso pubblico: scanner e dashboard usano la service role key lato server.
 ALTER TABLE settings        ENABLE ROW LEVEL SECURITY;
@@ -158,6 +169,7 @@ ALTER TABLE products        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE price_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alerts          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE clicks          ENABLE ROW LEVEL SECURITY;
 
 
 -- ── 9. MANUTENZIONE (facoltativa, da lanciare a mano ogni tanto) ────

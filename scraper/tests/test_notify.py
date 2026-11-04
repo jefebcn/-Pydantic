@@ -33,7 +33,7 @@ def test_format_deal_caption():
 def test_buttons_and_helpers(monkeypatch):
     monkeypatch.setattr(config, "DASHBOARD_URL", "https://pydantic.vercel.app/")
     [[amazon, dash]] = deal_buttons(DEAL)
-    assert amazon["url"] == "https://www.amazon.it/dp/B0TEST0001"
+    assert amazon["url"] == "https://pydantic.vercel.app/vai/B0TEST0001?da=avviso"
     assert dash["url"] == "https://pydantic.vercel.app/offerte/B0TEST0001"
     assert eur(1234.5) == "1.234,50 €" and eur(None) == "—"
 
@@ -84,7 +84,7 @@ def test_channel_post_has_card_and_no_triage_buttons(monkeypatch):
     (chat, jpeg, payload), = uploads
     assert chat == "-100777" and jpeg == b"jpeg" and "MARGINE" in payload["caption"]
     [[amazon, site], [follow]] = payload["reply_markup"]["inline_keyboard"]
-    assert amazon["url"].endswith("/dp/B0TEST0001") and site["url"].endswith("/offerte/B0TEST0001")
+    assert amazon["url"].endswith("/vai/B0TEST0001?da=canale") and site["url"].endswith("/offerte/B0TEST0001")
     assert follow["url"].endswith("?start=w_B0TEST0001")
 
 
@@ -156,3 +156,64 @@ def test_hunter_score():
     assert hunter_score({**verified, "margin_pct": -5, "profit_eur": -20}) == 8                # senza condizioni né guadagno
     doubtful = {**top, "new_price": None}
     assert hunter_score(doubtful) == 40 and score_label(doubtful) == "Da verificare"
+
+
+def ready_deal(asin, score_margin=60, profit=300, checked_hours=1, **kw):
+    from datetime import datetime, timedelta, timezone
+    checked = datetime.now(timezone.utc) - timedelta(hours=checked_hours)
+    return {"asin": asin, "used_price": 500.0, "margin_pct": score_margin, "profit_eur": profit, "used_condition": "Usato - Buone condizioni",
+            "new_price": 900.0, "new_price_any": 900.0, "checked_at": checked.isoformat(), **kw}
+
+
+def test_channel_posts_the_best_one_at_its_own_pace(monkeypatch):
+    import time
+
+    from scraper.notify import CHANNEL_DAILY_MAX, channel_next
+    monkeypatch.setattr(config, "TELEGRAM_CHANNEL_ID", "-100")
+    now = time.time()
+    best, good, weak = ready_deal("BEST"), ready_deal("GOOD", 45, 150), ready_deal("WEAK", 41, 60)
+    assert channel_next([weak, good, best], {}, now, 12, 40, 50)["asin"] == "BEST"
+    assert channel_next([weak], {}, now, 12, 40, 50) is None                                   # voto troppo basso
+    assert channel_next([best], {}, now, 3, 40, 50) is None                                    # di notte aspetta
+    stale = ready_deal("OLD", checked_hours=9)
+    assert channel_next([stale], {}, now, 12, 40, 50) is None                                  # prezzo troppo vecchio
+    assert channel_next([ready_deal("NOPE", new_price=None)], {}, now, 12, 40, 50) is None     # prezzo dubbio
+    just_posted = {"X": {"price": 1.0, "ts": now - 600}}
+    ordinary = ready_deal("ORD", 50, 200)
+    assert channel_next([ordinary], just_posted, now, 12, 40, 50) is None                      # troppo presto
+    assert channel_next([best], just_posted, now, 12, 40, 50)["asin"] == "BEST"                # affare eccezionale: subito
+    assert channel_next([ordinary], {"X": {"price": 1.0, "ts": now - 3600}}, now, 12, 40, 50)["asin"] == "ORD"
+    full = {str(i): {"price": 1.0, "ts": now - 3600 - i} for i in range(CHANNEL_DAILY_MAX)}
+    assert channel_next([best], full, now, 12, 40, 50) is None                                 # limite del giorno
+    assert channel_next([best], {"BEST": {"price": 500.0, "ts": now - 3600}}, now, 12, 40, 50) is None   # già uscita
+
+
+def test_channel_post_is_corrected_when_the_price_changes():
+    from scraper.notify import channel_edit_needed
+    last = {"price": 100.0, "ts": 0}
+    assert channel_edit_needed(last, 110.0)                         # è salito
+    assert not channel_edit_needed(last, 100.5)                     # variazione minima
+    assert not channel_edit_needed(last, 90.0)                      # è sceso: si ripubblica
+    risen = {**last, "shown": 110.0}
+    assert not channel_edit_needed(risen, 110.0)                    # già corretto
+    assert channel_edit_needed(risen, 120.0)                        # sale ancora
+    assert channel_edit_needed(risen, 100.0)                        # è tornato: via l'avviso
+
+
+def test_edit_keeps_buttons_and_warns(monkeypatch):
+    calls = []
+    monkeypatch.setattr(config, "TELEGRAM_CHANNEL_ID", "-100")
+    monkeypatch.setattr(notify, "call", lambda method, body: calls.append((method, body)) or {"ok": True})
+    assert notify.edit_channel_post(7, DEAL, 22, 1500.0, 1589.02)
+    method, body = calls[0]
+    assert method == "editMessageCaption" and body["message_id"] == 7 and "Prezzo salito" in body["caption"]
+    assert body["reply_markup"]["inline_keyboard"]
+    assert notify.edit_channel_post(7, DEAL, 22, 1589.02, 1589.02)
+    assert "Prezzo salito" not in calls[1][1]["caption"]
+
+
+def test_links_to_amazon_are_counted_only_with_a_site(monkeypatch):
+    monkeypatch.setattr(config, "DASHBOARD_URL", "https://x.app/")
+    assert notify.out_url("B0TEST0001", "bot") == "https://x.app/vai/B0TEST0001?da=bot"
+    monkeypatch.setattr(config, "DASHBOARD_URL", "")
+    assert notify.out_url("B0TEST0001", "bot") == "https://www.amazon.it/dp/B0TEST0001"

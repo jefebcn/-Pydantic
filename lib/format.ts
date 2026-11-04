@@ -20,6 +20,8 @@ export function shortCondition(c: string | null | undefined) {
 }
 
 export const amazonUrl = (asin: string) => `https://www.amazon.it/dp/${asin}`;
+/** Link ad Amazon dal sito: passa da /vai, che conta il clic. */
+export const outUrl = (asin: string) => `/vai/${asin}?da=sito`;
 
 export function marginTone(m: number | null | undefined) {
   if (m == null) return "text-muted";

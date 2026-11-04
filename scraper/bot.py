@@ -22,7 +22,7 @@ from typing import Callable
 import requests
 
 from . import config, pace, subscribers
-from .notify import (api, bot_link, call, deal_card, deal_url, eur, format_deal, hunter_score, parse_chats, post,
+from .notify import (api, bot_link, call, deal_card, deal_url, eur, format_deal, hunter_score, out_url, parse_chats, post,
                      ref_warning, triage_row)
 
 COMMANDS = [
@@ -152,7 +152,7 @@ def deal_line(i: int, d: dict) -> str:
     title = html.escape((d["title"] or d["asin"])[:70])
     flag = " ⚠️" if ref_warning(d) else ""
     return (f"{i}. <b>{float(d['margin_pct']):.0f}%</b> · +{eur(d['profit_eur'], 0)} · {eur(d['used_price'])}{flag}\n"
-            f"<a href=\"{config.BASE_URL}/dp/{d['asin']}\">{title}</a>")
+            f"<a href=\"{out_url(d['asin'], 'gruppo')}\">{title}</a>")
 
 
 def _deal_list(head: str, deals: list[dict]) -> str:
@@ -182,6 +182,37 @@ def status_text(store) -> str:
     if pace.wait_seconds(state):
         pause = f"⏸ In pausa dopo un blocco di Amazon: riparte alle <b>{datetime.fromtimestamp(state['resume_at']):%H:%M}</b>\n"
     best = max((float(d["margin_pct"]) for d in live), default=0)
+    return "\n\n".join([_scanner_text(pause, seen, state, live, hot, doubtful, best, margin_min, profit_min), audience_text(store)])
+
+
+def audience_text(store) -> str:
+    """Chi usa il servizio: i numeri da guardare prima di decidere come guadagnarci."""
+    use = subscribers.usage(time.time())
+    premium = use["premium"]
+    lines = ["👥 <b>Pubblico</b>",
+             f"Bot: <b>{use['people']}</b> persone, {use['active']} attive in 7 giorni",
+             f"Avvisi accesi: <b>{use['alerts_on']}</b> · prodotti seguiti: <b>{use['watching']}</b>",
+             f"Premium: 5 € <b>{premium[5]}</b> · 15 € <b>{premium[15]}</b> · non pagherei <b>{premium[0]}</b>"]
+    if config.TELEGRAM_CHANNEL_ID:
+        members = api("getChatMemberCount", json={"chat_id": config.TELEGRAM_CHANNEL_ID})
+        if members:
+            lines.append(f"Canale: <b>{members.get('result')}</b> iscritti")
+    since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    try:
+        clicks = store._req("GET", f"clicks?select=source&clicked_at=gte.{since}&limit=10000") or []
+    except Exception:   # tabella non ancora creata: si veda supabase/schema.sql
+        lines.append("Clic su Amazon: da attivare (supabase/schema.sql)")
+    else:
+        counts: dict[str, int] = {}
+        for c in clicks:
+            if c.get("source"):
+                counts[c["source"]] = counts.get(c["source"], 0) + 1
+        detail = " · ".join(f"{k} {v}" for k, v in sorted(counts.items(), key=lambda kv: -kv[1]))
+        lines.append(f"Clic su Amazon in 7 giorni: <b>{sum(counts.values())}</b>{f' ({detail})' if detail else ''}")
+    return "\n".join(lines)
+
+
+def _scanner_text(pause, seen, state, live, hot, doubtful, best, margin_min, profit_min) -> str:
     return (
         "📡 <b>Stato scanner</b>\n"
         f"{pause}"
@@ -283,7 +314,7 @@ def home_screen(store, first_name: str = "") -> Screen:
         [{"text": "🏆 Le migliori", "callback_data": "d:top:0:"}, {"text": "🆕 Nuove", "callback_data": "d:new:0:"}],
         [{"text": "💶 Per budget", "callback_data": "m:b"}, {"text": "🗂 Categorie", "callback_data": "m:c"}],
         [{"text": "🎯 I miei avvisi", "callback_data": "a"}, {"text": "🔔 Seguiti", "callback_data": "d:w:0:"}],
-        [{"text": "❓ Come funziona", "callback_data": "m:h"}],
+        [{"text": "❓ Come funziona", "callback_data": "m:h"}, {"text": "⭐ Premium", "callback_data": "p"}],
     ]
     links = [{"text": "📣 Canale", "url": config.TELEGRAM_CHANNEL_URL}]
     if config.DASHBOARD_URL:
@@ -295,6 +326,19 @@ def home_screen(store, first_name: str = "") -> Screen:
 
 def help_screen() -> Screen:
     return Screen(HELP, [[BACK_HOME]])
+
+
+def premium_screen(chat) -> Screen:
+    """Premium non esiste ancora: prima di costruirlo si chiede se e quanto interessa."""
+    answer = subscribers.get(chat).get("premium")
+    labels = {5: "Fino a 5 € al mese", 15: "Fino a 15 € al mese", 0: "Non pagherei"}
+    rows = [[{"text": f"{'✅ ' if answer == price else ''}{labels[price]}", "callback_data": f"p:{price}"}]
+            for price in subscribers.PREMIUM_CHOICES]
+    thanks = "\n\n🙏 Grazie, ho segnato la tua risposta. Puoi cambiarla quando vuoi." if answer is not None else ""
+    return Screen("⭐ <b>Stiamo pensando a una versione Premium</b>\n"
+                  "Avvisi prima che le offerte escano nel canale, nessun limite giornaliero, più prodotti seguiti.\n\n"
+                  "Non esiste ancora e rispondere non ti impegna a nulla: quanto pagheresti?" + thanks,
+                  rows + [[BACK_HOME]])
 
 
 def budget_screen(store) -> Screen:
@@ -344,7 +388,7 @@ def _deal_rows(d: dict, kind: str, i: int, n: int, arg: str, watched: bool) -> l
         rows.append([{"text": "◀️", "callback_data": f"d:{kind}:{(i - 1) % n}:{arg}"},
                      {"text": f"{i + 1} di {n}", "callback_data": "n"},
                      {"text": "▶️", "callback_data": f"d:{kind}:{(i + 1) % n}:{arg}"}])
-    links = [{"text": "🛒 Apri su Amazon", "url": f"{config.BASE_URL}/dp/{d['asin']}"}]
+    links = [{"text": "🛒 Apri su Amazon", "url": out_url(d["asin"], "bot")}]
     if config.DASHBOARD_URL:
         links.append({"text": "📊 Analisi", "url": deal_url(d["asin"])})
     rows.append(links)
@@ -490,6 +534,7 @@ def handle_update(update: dict, store) -> tuple[str, str | Screen, int | None] |
     if cmd == "stato":
         return chat, (status_text(store) if is_linked(chat) else "🔒 Questo comando è per chi gestisce il bot. Prova /start."), topic
     if private:
+        subscribers.touch(chat)
         if cmd is None:      # scrivere un nome equivale a cercarlo
             return chat, deal_screen(store, chat, "s", 0, text), None
         out = private_command(cmd, args_of(text), store, chat, (msg.get("from") or {}).get("first_name", ""))
@@ -525,6 +570,7 @@ def handle_nav(cb: dict, store) -> tuple[str | None, Screen | None]:
     data = cb.get("data") or ""
     if (msg.get("chat") or {}).get("type") != "private":
         return "Scrivimi in privato per usare questo pulsante", None
+    subscribers.touch(chat)
     if data == "n":
         return None, None
     if data == "h":
@@ -547,6 +593,11 @@ def handle_nav(cb: dict, store) -> tuple[str | None, Screen | None]:
         notice = ("🔔 Ti avviso se il prezzo scende" if now_on else "🔕 Non lo segui più" if now_on is False
                   else f"Segui già {subscribers.WATCH_MAX} prodotti")
         return notice, deal_screen(store, chat, kind, int(i), arg)
+    if data == "p":
+        return None, premium_screen(chat)
+    if re.fullmatch(r"p:(5|15|0)", data):
+        subscribers.update(chat, lambda sub: sub.update(premium=int(data[2:])))
+        return "🙏 Grazie!", premium_screen(chat)
     if data == "a":
         return None, alerts_screen(chat)
     if data in ("a:on", "a:off"):

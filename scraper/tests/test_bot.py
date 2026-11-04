@@ -30,6 +30,8 @@ class FakeStore:
     def _req(self, method, path):
         if path.startswith("price_snapshots"):
             return [{"checked_at": hours_ago(1)}]
+        if path.startswith("clicks"):
+            return [{"source": "canale"}, {"source": "canale"}, {"source": "bot"}]
         return self.deals
 
     def deal(self, asin):
@@ -287,3 +289,32 @@ def test_show_falls_back_to_the_banner_without_a_photo(monkeypatch):
     monkeypatch.setattr(bot, "banner", lambda: b"banner")
     assert bot.show(1, bot.Screen("testo", [], key="k", image=lambda: None))
     assert calls[0]["files"]["photo"][1] == b"banner"
+
+
+def test_premium_question_and_audience_numbers(monkeypatch):
+    monkeypatch.setattr(bot, "api", lambda method, **kw: {"result": 42})
+    monkeypatch.setattr(config, "TELEGRAM_CHANNEL_ID", "-100")
+    store = FakeStore()
+    _, screen = press("p", store)
+    assert "non ti impegna" in screen.caption
+    notice, screen = press("p:15", store)
+    assert "Grazie" in notice and any(b["text"].startswith("✅ Fino a 15") for b in buttons(screen))
+    assert press("p:99", store)[1] is None
+    _, text, _ = bot.handle_update(msg("/stato"), store)
+    assert "Bot: <b>1</b> persone, 1 attive" in text and "15 € <b>1</b>" in text
+    assert "Canale: <b>42</b> iscritti" in text and "<b>3</b> (canale 2 · bot 1)" in text
+
+
+def test_stato_survives_a_missing_clicks_table(monkeypatch):
+    monkeypatch.setattr(bot, "api", lambda method, **kw: None)
+    store = FakeStore()
+    real = store._req
+
+    def broken(method, path):
+        if path.startswith("clicks"):
+            raise RuntimeError("relation does not exist")
+        return real(method, path)
+
+    store._req = broken
+    _, text, _ = bot.handle_update(msg("/stato"), store)
+    assert "da attivare" in text and "Offerte attive" in text
