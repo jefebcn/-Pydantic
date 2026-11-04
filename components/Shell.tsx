@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useData } from "./DataProvider";
 import { IconBell, IconBox, IconChevronDown, IconGrid, IconLock, IconLogout, IconSliders, IconTag } from "./icons";
-import { ago } from "@/lib/format";
+import { ago, isScannerOn } from "@/lib/format";
 
 const NAV = [
   { href: "/", label: "Panoramica", Icon: IconGrid, admin: false },
@@ -24,17 +24,11 @@ export function Logo({ size = 44 }: { size?: number }) {
   );
 }
 
-function useScannerOn() {
-  const { scanner, updatedAt } = useData();
-  const last = scanner.last_check ? new Date(scanner.last_check).getTime() : 0;
-  // confronto con l'ora dell'ultimo aggiornamento dati (si rinnova ogni minuto)
-  return last > 0 && (updatedAt?.getTime() ?? 0) - last < 45 * 60_000;
-}
-
 function ScannerPill() {
-  const { scanner, loading } = useData();
-  const on = useScannerOn();
+  const { scanner, loading, updatedAt } = useData();
   if (loading) return null;
+  // confronto con l'ora dell'ultimo aggiornamento dati (si rinnova ogni minuto)
+  const on = isScannerOn(scanner.last_check, updatedAt?.getTime() ?? 0);
   return (
     <div className="hidden h-10 items-center gap-2 rounded-full border border-line px-3.5 text-xs md:flex" title={`Ultimo controllo: ${ago(scanner.last_check)}`}>
       <span className="relative flex h-2 w-2">
@@ -53,6 +47,7 @@ function NotifyBell() {
     <button
       onClick={enableNotifications}
       title={notifyOn ? "Notifiche del browser attive su questo dispositivo" : "Attiva le notifiche del browser"}
+      aria-label={notifyOn ? "Notifiche del browser attive" : "Attiva le notifiche del browser"}
       className="relative flex h-10 w-10 items-center justify-center rounded-full border border-line hover:bg-soft"
     >
       <IconBell size={18} />
@@ -128,6 +123,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 key={href}
                 href={href}
                 title={label}
+                aria-label={label}
+                aria-current={isActive(href) ? "page" : undefined}
                 className={`relative flex h-11 w-11 items-center justify-center rounded-2xl transition-colors ${
                   isActive(href) ? "bg-white/10 text-white" : "text-zinc-500 hover:bg-white/5 hover:text-zinc-200"
                 }`}
@@ -139,11 +136,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
           </nav>
           <div className="mt-auto">
             {admin ? (
-              <button onClick={logout} title="Esci dall'area admin" className="flex h-11 w-11 items-center justify-center rounded-2xl text-zinc-500 hover:bg-white/5 hover:text-zinc-200">
+              <button onClick={logout} title="Esci dall'area admin" aria-label="Esci dall'area admin" className="flex h-11 w-11 items-center justify-center rounded-2xl text-zinc-500 hover:bg-white/5 hover:text-zinc-200">
                 <IconLogout />
               </button>
             ) : (
-              <Link href="/accedi" title="Accedi come admin" className="flex h-11 w-11 items-center justify-center rounded-2xl text-zinc-500 hover:bg-white/5 hover:text-zinc-200">
+              <Link href="/accedi" title="Accedi come admin" aria-label="Accedi come admin" className="flex h-11 w-11 items-center justify-center rounded-2xl text-zinc-500 hover:bg-white/5 hover:text-zinc-200">
                 <IconLock />
               </Link>
             )}

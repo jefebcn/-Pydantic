@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import { useData } from "@/components/DataProvider";
 import { DealsByBand, DealsTable } from "@/components/DealsTable";
 import { StatusBanner } from "@/components/StatusBanner";
-import { Button, Empty, PageHeader, Tabs, inputCls } from "@/components/ui";
+import { Button, Empty, PageHeader, Skeleton, Tabs, inputCls } from "@/components/ui";
 import type { Deal } from "@/lib/types";
-import { shortCondition } from "@/lib/format";
+import { refIssue, shortCondition } from "@/lib/format";
 
 type View = "attive" | "interessanti" | "tutte" | "ignorate";
 
@@ -26,6 +26,7 @@ export default function OffersPage() {
   const [minMargin, setMinMargin] = useState(0);
   const [sort, setSort] = useState<"margin" | "profit" | "recent" | "price">("profit");
   const [bands, setBands] = useState(true);
+  const [verifiedOnly, setVerifiedOnly] = useState(false);
 
   const categories = useMemo(() => [...new Set(deals.map((d) => d.category).filter(Boolean))].sort() as string[], [deals]);
   const conditions = useMemo(
@@ -41,6 +42,7 @@ export default function OffersPage() {
         (d.margin_pct ?? -999) >= minMargin &&
         (!category || d.category === category) &&
         (!condition || shortCondition(d.used_condition) === condition) &&
+        (!verifiedOnly || !refIssue(d)) &&
         (!s || (d.title || "").toLowerCase().includes(s) || d.asin.toLowerCase().includes(s)),
     );
     const by: Record<typeof sort, (a: Deal, b: Deal) => number> = {
@@ -50,7 +52,7 @@ export default function OffersPage() {
       price: (a, b) => (b.used_price ?? 0) - (a.used_price ?? 0),
     };
     return out.sort(by[sort]);
-  }, [deals, view, q, category, condition, minMargin, sort]);
+  }, [deals, view, q, category, condition, minMargin, sort, verifiedOnly]);
 
   const count = (v: View) => deals.filter(VIEWS[v]).length;
 
@@ -68,13 +70,13 @@ export default function OffersPage() {
         onChange={setView}
         items={[
           { value: "attive", label: "Attive", count: count("attive") },
-          { value: "interessanti", label: "★ Interessanti", count: count("interessanti") },
+          ...(admin ? [{ value: "interessanti" as View, label: "★ Interessanti", count: count("interessanti") }] : []),
           { value: "tutte", label: "Tutte (7 gg)", count: count("tutte") },
-          { value: "ignorate", label: "Ignorate", count: count("ignorate") },
+          ...(admin ? [{ value: "ignorate" as View, label: "Ignorate", count: count("ignorate") }] : []),
         ]}
       />
 
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-7">
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca titolo o ASIN" className={`${inputCls} col-span-2`} />
         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
           <option value="">Tutte le categorie</option>
@@ -98,11 +100,15 @@ export default function OffersPage() {
           <input type="checkbox" checked={bands} onChange={(e) => setBands(e.target.checked)} className="accent-ink" />
           <span className="whitespace-nowrap">Per fascia di prezzo</span>
         </label>
+        <label className={`${inputCls} flex cursor-pointer items-center gap-2`} title="Nasconde le offerte col prezzo del nuovo da verificare">
+          <input type="checkbox" checked={verifiedOnly} onChange={(e) => setVerifiedOnly(e.target.checked)} className="accent-ink" />
+          <span className="whitespace-nowrap">Solo prezzo verificato</span>
+        </label>
       </div>
 
       <p className="mb-3 text-xs text-muted">{list.length} offerte</p>
       {loading ? (
-        <p className="text-muted">Caricamento…</p>
+        <Skeleton className="h-64" />
       ) : !list.length ? (
         <Empty>Nessuna offerta con questi filtri.</Empty>
       ) : bands ? (

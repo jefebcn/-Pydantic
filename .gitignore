@@ -36,3 +36,5 @@ scraper/.env
 scraper/.cache.json
 scraper/debug/
 scraper/.state.json
+scraper/*.tmp
+scraper/scanner.log*

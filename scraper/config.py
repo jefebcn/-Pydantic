@@ -113,5 +113,6 @@ DASHBOARD_URL = os.getenv("DASHBOARD_URL", "")
 
 CACHE_FILE = ROOT / ".cache.json"
 STATE_FILE = ROOT / ".state.json"   # ritmo attuale, blocchi, posizione nella rotazione delle ricerche
+LOG_FILE = ROOT / "scanner.log"     # ultimi log dello scanner (ruota a 1 MB), per capire perché si è fermato
 DEBUG_DIR = ROOT / "debug"
 DEBUG = False   # True con --debug: salva in DEBUG_DIR l'HTML di ogni pagina scaricata

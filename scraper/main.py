@@ -1,7 +1,7 @@
 """Ciclo principale: cerca offerte Seconda Mano, salva prezzi, invia avvisi.
 
 Uso (dalla cartella del progetto):
-    python -m scraper.main              # gira per sempre, al ritmo di SCAN_SPEED (default lento)
+    python -m scraper.main              # gira per sempre, al ritmo di SCAN_SPEED (default lento), una sola istanza
     python -m scraper.main --speed normale     # profilo massimo diverso (lento | normale | veloce)
     python -m scraper.main --once       # un solo ciclo
     python -m scraper.main --telegram-setup    # nome, foto, biografia e comandi del bot Telegram
@@ -13,17 +13,60 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
+import logging.handlers
+import os
+import socket
+import sys
 import threading
 import time
+import traceback
 from datetime import datetime
+from pathlib import Path
 
 from . import bot, config, pace
 from .amazon import AmazonClient, CaptchaError, LocationError, SearchItem
-from .notify import send_deal, telegram
+from .notify import is_new_low, send_deal, telegram
+
+ALREADY_RUNNING = 3            # codice di uscita: avvia-scanner.bat non riparte
+INSTANCE_PORT = 47853          # porta locale tenuta occupata finché lo scanner gira
+
+_file_log = logging.getLogger("scanner")
+
+
+def setup_log_file() -> None:
+    handler = logging.handlers.RotatingFileHandler(config.LOG_FILE, maxBytes=1_000_000, backupCount=1, encoding="utf-8")
+    handler.setFormatter(logging.Formatter("%(asctime)s %(message)s", "%Y-%m-%d %H:%M:%S"))
+    _file_log.addHandler(handler)
+    _file_log.setLevel(logging.INFO)
+    _file_log.propagate = False
 
 
 def log(msg: str) -> None:
     print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
+    _file_log.info(msg)
+
+
+def hold_single_instance() -> socket.socket | None:
+    """Due scanner insieme raddoppierebbero le richieste ad Amazon e litigherebbero per i comandi Telegram.
+    Il sistema libera la porta quando il processo finisce, anche se si chiude di colpo."""
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", INSTANCE_PORT))
+        return s
+    except OSError:
+        s.close()
+        return None
+
+
+def write_json(path: Path, data: dict) -> None:
+    """Scrittura atomica; un file bloccato (la cartella è su OneDrive) non deve fermare lo scanner."""
+    tmp = path.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(data))
+        os.replace(tmp, path)
+    except OSError as e:
+        log(f"non riesco a salvare {path.name}: {e!r}")
 
 
 def load_cache() -> dict:
@@ -34,7 +77,7 @@ def load_cache() -> dict:
 
 
 def save_cache(cache: dict) -> None:
-    config.CACHE_FILE.write_text(json.dumps(cache))
+    write_json(config.CACHE_FILE, cache)
 
 
 def load_state() -> dict:
@@ -45,7 +88,7 @@ def load_state() -> dict:
 
 
 def save_state(state: dict) -> None:
-    config.STATE_FILE.write_text(json.dumps(state))
+    write_json(config.STATE_FILE, state)
 
 
 def needs_check(item: SearchItem, cache: dict) -> bool:
@@ -106,8 +149,9 @@ def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
         log(f"  {it.asin} usato {used_price}€ | nuovo {d['ref_price']}€ | margine {margin:.0f}% (+{profit:.0f}€)")
         if d.get("triage") in ("ignorato", "acquistato"):
             continue
-        if margin >= min_margin and profit >= min_profit and not store.already_alerted(it.asin, used_price):
-            if send_deal(d, discount):  # senza Telegram configurato non segna nulla
+        if margin >= min_margin and profit >= min_profit:
+            floor = store.alert_floor(it.asin)
+            if is_new_low(used_price, floor) and send_deal(d, discount, previous=floor):  # senza Telegram non segna nulla
                 alerts += 1
                 store.mark_alerted(it.asin, used_price)
 
@@ -162,6 +206,14 @@ def main() -> None:
     except LocationError as e:
         raise SystemExit(f"{e}\nRiprova tra un po'; se continua, rilancia con --debug e controlla scraper/debug/.")
 
+    lock = None
+    if not a.once:
+        lock = hold_single_instance()
+        if lock is None:
+            print("Lo scanner è già in esecuzione: non ne avvio un altro.")
+            sys.exit(ALREADY_RUNNING)
+    setup_log_file()
+
     from .store import Store
     store = Store()
     if config.TELEGRAM_BOT_TOKEN:
@@ -215,4 +267,11 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    # i titoli hanno caratteri che alcune console non sanno mostrare: meglio un "?" che un errore
+    sys.stdout.reconfigure(errors="replace")
+    try:
+        main()
+    except Exception:
+        log(f"errore fatale:
+{traceback.format_exc()}")
+        raise

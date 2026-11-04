@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useData } from "@/components/DataProvider";
 import { InventoryModal } from "@/components/InventoryModal";
 import { StatusBanner } from "@/components/StatusBanner";
-import { Badge, Button, Empty, Kpi, PageHeader, Tabs, Thumb, inputCls } from "@/components/ui";
+import { Badge, Button, Empty, Kpi, PageHeader, Skeleton, Tabs, Thumb, inputCls } from "@/components/ui";
 import { STATUS_LABEL, STATUS_ORDER, type InventoryInput, type InventoryItem, type InventoryStatus } from "@/lib/types";
 import { amazonUrl, eur, todayISO } from "@/lib/format";
 
@@ -102,7 +102,7 @@ function Inventory() {
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca prodotto, ASIN o canale" className={`${inputCls} mb-3 max-w-sm`} />
 
       {loading ? (
-        <p className="text-muted">Caricamento…</p>
+        <Skeleton className="h-64" />
       ) : !list.length ? (
         <Empty>
           Nessun pezzo qui. Dalle <b>Offerte</b> premi il carrello su un prodotto comprato, oppure “Nuovo acquisto”.

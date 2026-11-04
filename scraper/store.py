@@ -60,10 +60,14 @@ class Store:
         rows = self._req("GET", "settings?id=eq.1&select=*")
         return rows[0] if rows else {}
 
-    def already_alerted(self, asin: str, used_price: float) -> bool:
-        rows = self._req("GET", f"alerts?asin=eq.{asin}&used_price=eq.{used_price}"
-                                f"&sent_at=gt.{_hours_ago(24)}&select=id&limit=1")
-        return bool(rows)
+    def alert_floor(self, asin: str) -> float | None:
+        """Il prezzo più basso già avvisato per questo prodotto nelle ultime 24 ore."""
+        rows = self._req("GET", f"alerts?asin=eq.{asin}&sent_at=gt.{_hours_ago(24)}"
+                                f"&select=used_price&order=used_price.asc&limit=1")
+        return float(rows[0]["used_price"]) if rows else None
+
+    def set_triage(self, asin: str, triage: str) -> None:
+        self._req("PATCH", f"products?asin=eq.{asin}", json={"triage": triage}, headers={"Prefer": "return=minimal"})
 
     def mark_alerted(self, asin: str, used_price: float) -> None:
         self._req("POST", "alerts", json={"asin": asin, "used_price": used_price},

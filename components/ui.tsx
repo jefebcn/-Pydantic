@@ -147,6 +147,11 @@ export function Modal({ open, onClose, title, children }: { open: boolean; onClo
   );
 }
 
+/** Segnaposto mentre i dati arrivano: evita di mostrare numeri a zero che sembrano veri. */
+export function Skeleton({ className = "" }: { className?: string }) {
+  return <div aria-hidden className={`animate-pulse rounded-3xl bg-soft ${className}`} />;
+}
+
 export function Empty({ children }: { children: React.ReactNode }) {
   return <div className="rounded-3xl border border-dashed border-ink/10 bg-white p-10 text-center text-sm text-muted">{children}</div>;
 }

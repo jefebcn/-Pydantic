@@ -7,9 +7,9 @@ import { DealsByBand } from "@/components/DealsTable";
 import { StatusBanner } from "@/components/StatusBanner";
 import { TrendChart, type Point } from "@/components/TrendChart";
 import { IconArrowUpRight, IconFilter, IconSend, IconStar } from "@/components/icons";
-import { Badge, Card, Empty, Kpi, PageHeader, PillSelect, SectionTitle, Thumb, type Pastel } from "@/components/ui";
+import { Badge, Card, Empty, Kpi, PageHeader, PillSelect, SectionTitle, Skeleton, Thumb, type Pastel } from "@/components/ui";
 import { STATUS_LABEL, STATUS_ORDER, type Deal } from "@/lib/types";
-import { amazonUrl, eur, marginTone, pct } from "@/lib/format";
+import { amazonUrl, eur, marginTone, pct, refIssue } from "@/lib/format";
 
 const BOT_URL = "https://t.me/SecondHandHunter_Bot";
 const TOP_COLORS: Pastel[] = ["lilac", "mint", "cream"];
@@ -80,7 +80,10 @@ function MarketTable({ deals }: { deals: Deal[] }) {
                     <Thumb src={d.image_url} size={40} />
                     <span className="min-w-0">
                       <span className="line-clamp-1 max-w-[30ch] font-semibold hover:underline">{d.title || d.asin}</span>
-                      <span className="block text-[11px] text-muted">{d.category}</span>
+                      <span className="block text-[11px] text-muted">
+                        {d.category}
+                        {refIssue(d) && <span title={`${refIssue(d)}: il margine reale può essere più basso`}> · ⚠ da verificare</span>}
+                      </span>
                     </span>
                   </a>
                 </td>
@@ -93,6 +96,7 @@ function MarketTable({ deals }: { deals: Deal[] }) {
                     <button
                       onClick={() => setTriage(d.asin, starred ? "da_valutare" : "interessante")}
                       title={starred ? "Togli da interessanti" : "Segna interessante"}
+                      aria-label={starred ? "Togli da interessanti" : "Segna interessante"}
                       className={`inline-flex ${starred ? "text-amber-500" : "text-ink/25 hover:text-ink/60"}`}
                     >
                       <IconStar size={18} filled={starred} />
@@ -209,12 +213,18 @@ export default function Overview() {
     const hot = live.filter(
       (d) => (d.margin_pct ?? 0) >= (settings?.alert_margin_pct ?? 40) && (d.profit_eur ?? 0) >= (settings?.alert_profit_eur ?? 50),
     );
+    const byProfit = live.slice().sort((a, b) => (b.profit_eur ?? 0) - (a.profit_eur ?? 0));
+    // i numeri in evidenza contano solo i prezzi verificati: un riferimento gonfiato li falserebbe
+    const verified = byProfit.filter((d) => !refIssue(d));
+    const hotVerified = hot.filter((d) => !refIssue(d));
     return {
       live,
       hot,
-      byProfit: live.slice().sort((a, b) => (b.profit_eur ?? 0) - (a.profit_eur ?? 0)),
-      hotProfit: hot.reduce((s, d) => s + (d.profit_eur ?? 0), 0),
-      best: live.reduce((m, d) => Math.max(m, d.margin_pct ?? 0), 0),
+      byProfit,
+      top: verified.slice(0, 3),
+      hotVerified: hotVerified.length,
+      hotProfit: hotVerified.reduce((s, d) => s + (d.profit_eur ?? 0), 0),
+      best: verified.reduce((m, d) => Math.max(m, d.margin_pct ?? 0), 0),
     };
   }, [deals, settings]);
 
@@ -243,9 +253,14 @@ export default function Overview() {
           <div className="rounded-3xl bg-sky p-5">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-[28px] font-extrabold tracking-tight tabular-nums">{eur(k.hotProfit, 0)}</div>
-                <div className="text-xs text-ink/60">
-                  Guadagno potenziale · {k.hot.length} offerte sopra soglia su {k.live.length}
+                {loading ? (
+                  <Skeleton className="h-9 w-32 bg-white/60" />
+                ) : (
+                  <div className="text-[28px] font-extrabold tracking-tight tabular-nums">{eur(k.hotProfit, 0)}</div>
+                )}
+                <div className="mt-0.5 text-xs text-ink/60">
+                  Guadagno potenziale · {k.hotVerified} offerte sopra soglia col prezzo verificato
+                  {k.hot.length > k.hotVerified && `, altre ${k.hot.length - k.hotVerified} da verificare`}
                 </div>
               </div>
               <Badge tone="green">migliore {pct(k.best)}</Badge>
@@ -271,11 +286,15 @@ export default function Overview() {
           <SectionTitle right={<Link href="/offerte" title="Tutte le offerte con filtri" className="text-muted hover:text-ink"><IconFilter /></Link>}>
             Le migliori ora
           </SectionTitle>
-          {!loading && !k.byProfit.length ? (
-            <Empty>Nessuna offerta attiva. Lo scanner sul PC è acceso?</Empty>
+          {loading ? (
+            <div className="grid gap-3 sm:grid-cols-3">
+              {TOP_COLORS.map((c) => <Skeleton key={c} className="h-44" />)}
+            </div>
+          ) : !k.top.length ? (
+            <Empty>Nessuna offerta attiva con prezzo verificato in questo momento.</Empty>
           ) : (
             <div className="-mx-4 flex snap-x gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 sm:pb-0">
-              {k.byProfit.slice(0, 3).map((d, i) => <TopCard key={d.asin} d={d} color={TOP_COLORS[i]} />)}
+              {k.top.map((d, i) => <TopCard key={d.asin} d={d} color={TOP_COLORS[i]} />)}
             </div>
           )}
         </section>
@@ -296,7 +315,13 @@ export default function Overview() {
               ]} />
             </div>
           </div>
-          {market.rows.length ? <MarketTable deals={market.rows} /> : <Empty>Nessuna offerta nuova in questo periodo.</Empty>}
+          {loading ? (
+            <Skeleton className="h-64" />
+          ) : market.rows.length ? (
+            <MarketTable deals={market.rows} />
+          ) : (
+            <Empty>Nessuna offerta nuova in questo periodo.</Empty>
+          )}
         </section>
         <aside>
           <TelegramCard />
@@ -309,7 +334,13 @@ export default function Overview() {
         <SectionTitle right={<Link href="/offerte" className="text-sm font-medium text-muted hover:text-ink">Tutte le offerte →</Link>}>
           Per fascia di prezzo
         </SectionTitle>
-        {!loading && !k.live.length ? null : <DealsByBand deals={k.byProfit} limit={5} />}
+        {loading ? (
+          <Skeleton className="h-64" />
+        ) : k.live.length ? (
+          <DealsByBand deals={k.byProfit} limit={5} />
+        ) : (
+          <Empty>Nessuna offerta attiva in questo momento.</Empty>
+        )}
       </section>
     </>
   );

@@ -28,6 +28,24 @@ export function marginTone(m: number | null | undefined) {
   return "text-ink/70";
 }
 
+/** Sopra questo intervallo dall'ultimo giro lo scanner si considera fermo (a velocità lenta un ciclo dura 60 min + il giro). */
+export const SCANNER_STALE_MS = 2 * 3600e3;
+
+export function isScannerOn(lastCheck: string | null | undefined, now: number) {
+  return !!lastCheck && now - new Date(lastCheck).getTime() < SCANNER_STALE_MS;
+}
+
+/** Sotto questa quota del prezzo Amazon un nuovo di altri venditori rende dubbio il riferimento (come scraper/notify.py). */
+const CHEAPER_NEW = 0.95;
+
+/** Perché il prezzo del nuovo va verificato: il margine reale può essere più basso. Null se è affidabile. */
+export function refIssue(d: { new_price: number | null; new_price_any: number | null }) {
+  if (d.new_price == null) return "Nuovo solo da altri venditori";
+  if (d.new_price_any != null && Number(d.new_price_any) < Number(d.new_price) * CHEAPER_NEW)
+    return `C'è un nuovo più economico a ${eur(d.new_price_any, 0)}`;
+  return null;
+}
+
 export const todayISO = () => new Date().toISOString().slice(0, 10);
 
 /** Fasce di prezzo Seconda Mano per raggruppare le offerte (estremo superiore escluso). */

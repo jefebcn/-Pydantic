@@ -45,10 +45,17 @@ Gli avvisi arrivano come foto del prodotto con margine, prezzi e pulsanti "Apri 
 
 | Comando | Cosa fa | Dove |
 |---|---|---|
-| `/top` | le 5 offerte attive con più guadagno | solo chat collegate |
-| `/stato` | ultimo controllo, velocità, offerte attive e sopra soglia | solo chat collegate |
+| `/top [n]` | le offerte attive con più guadagno (5, massimo 10) | solo chat collegate |
+| `/nuove` | le offerte comparse nelle ultime 24 ore | solo chat collegate |
+| `/fasce` | quante offerte per fascia di prezzo e la migliore di ognuna | solo chat collegate |
+| `/cerca parole` | cerca fra le offerte attive, es. `/cerca rtx 5070` | solo chat collegate |
+| `/stato` | ultimo giro, velocità, pausa dopo un blocco, offerte attive e sopra soglia | solo chat collegate |
 | `/chatid` | ID della chat (e del topic) da mettere in `TELEGRAM_CHAT_ID` | ovunque |
 | `/help` | cosa fa il bot | ovunque |
+
+Negli avvisi in chat privata ci sono anche i pulsanti **☆ Interessante** e **✕ Ignora**, che aggiornano il gestionale. Nei gruppi non compaiono, perché li potrebbe premere chiunque. Entro 24 ore un prodotto già avvisato viene riproposto solo se il prezzo scende almeno dell'1%, con la riga "📉 Prezzo sceso".
+
+Il segno ⚠️ (sul sito "da verificare") vuol dire che il prezzo del nuovo può essere gonfiato: viene solo da altri venditori, oppure uno di loro vende a meno di Amazon. In quel caso il margine reale può essere più basso.
 
 **Gruppo dedicato agli avvisi:** crea il gruppo, aggiungi il bot (in un canale come amministratore). Il bot scrive da solo l'ID del gruppo; aggiungilo a `TELEGRAM_CHAT_ID` separato da virgola (es. `8498296680,-1001234567890`) e riavvia lo scanner. In un gruppo con argomenti usa `id_gruppo:id_topic` (te lo dà `/chatid` scritto nel topic). La foto del gruppo può essere la stessa del bot.
 
@@ -89,6 +96,7 @@ Imposta le variabili di `.env.example` (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_K
 - Se Amazon chiede il CAPTCHA o una verifica anti-robot, lo scanner non prova ad aggirarla: si ferma, avvisa su Telegram, scende di una velocità e riprova dopo una pausa che raddoppia a ogni blocco (30, 60, 120… fino a 6 ore). Dopo 6 cicli senza blocchi risale di una velocità, mai oltre `SCAN_SPEED`. Lo stato sta in `scraper/.state.json`.
 - La connessione degli utenti risulta da San Marino: lo scanner imposta da solo il CAP italiano `DELIVERY_ZIP` (default 20121), altrimenti Amazon nasconde prezzi e offerte.
 - Categorie e parole chiave stanno in `scraper/config.py` (`SEARCHES`).
+- Se lo scanner si chiude, `avvia-scanner.bat` lo fa ripartire dopo un minuto; chiudendo la finestra si ferma davvero. Gira una sola copia alla volta. Il registro è in `scraper/scanner.log`. A PC spento o in sospensione non cerca nulla: il sito lo segnala con "Scanner fermo".
 
 ## Sviluppo
 ```bash

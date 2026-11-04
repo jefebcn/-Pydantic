@@ -6,13 +6,20 @@ import { IconArrowUpRight, IconCart, IconStar, IconUndo, IconX } from "./icons";
 import { useData } from "./DataProvider";
 import { InventoryModal } from "./InventoryModal";
 import type { Deal, InventoryInput } from "@/lib/types";
-import { ago, amazonUrl, byPriceBand, eur, marginTone, shortCondition } from "@/lib/format";
+import { ago, amazonUrl, byPriceBand, eur, marginTone, refIssue, shortCondition } from "@/lib/format";
 
 function TriageBadge({ d }: { d: Deal }) {
   if (d.triage === "interessante") return <Badge tone="amber">★ Interessante</Badge>;
   if (d.triage === "acquistato") return <Badge tone="green">✓ Acquistato</Badge>;
   if (d.triage === "ignorato") return <Badge>Ignorato</Badge>;
   return null;
+}
+
+/** Il prezzo del nuovo va verificato: il margine mostrato può essere più alto di quello reale. */
+function RefBadge({ d }: { d: Deal }) {
+  const issue = refIssue(d);
+  if (!issue) return null;
+  return <span title={`${issue}: il margine reale può essere più basso`}><Badge tone="amber">⚠ Da verificare</Badge></span>;
 }
 
 function Actions({ d, onBuy }: { d: Deal; onBuy: () => void }) {
@@ -23,16 +30,16 @@ function Actions({ d, onBuy }: { d: Deal; onBuy: () => void }) {
     <div className="flex items-center justify-end gap-1">
       {admin && (
         <>
-          <Button size="icon" variant="ghost" title={starred ? "Togli da interessanti" : "Segna interessante"}
+          <Button size="icon" variant="ghost" title={starred ? "Togli da interessanti" : "Segna interessante"} aria-label={starred ? "Togli da interessanti" : "Segna interessante"}
             onClick={() => setTriage(d.asin, starred ? "da_valutare" : "interessante")}
             className={starred ? "text-amber-500" : ""}>
             <IconStar size={16} filled={starred} />
           </Button>
-          <Button size="icon" variant="ghost" title={ignored ? "Ripristina" : "Ignora (niente più avvisi)"}
+          <Button size="icon" variant="ghost" title={ignored ? "Ripristina" : "Ignora (niente più avvisi)"} aria-label={ignored ? "Ripristina" : "Ignora"}
             onClick={() => setTriage(d.asin, ignored ? "da_valutare" : "ignorato")}>
             {ignored ? <IconUndo size={16} /> : <IconX size={16} />}
           </Button>
-          <Button size="icon" variant="soft" onClick={onBuy} disabled={d.triage === "acquistato"} title="Registra l'acquisto in magazzino">
+          <Button size="icon" variant="soft" onClick={onBuy} disabled={d.triage === "acquistato"} title="Registra l'acquisto in magazzino" aria-label="Registra l'acquisto in magazzino">
             <IconCart size={16} />
           </Button>
         </>
@@ -84,6 +91,7 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                         <span>{shortCondition(d.used_condition)}</span>
                         <span>· {ago(d.first_seen_at)}</span>
                         {!d.active && <Badge tone="red">sparita</Badge>}
+                        <RefBadge d={d} />
                         <TriageBadge d={d} />
                       </div>
                     </div>
@@ -113,6 +121,7 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                 <a href={amazonUrl(d.asin)} target="_blank" rel="noreferrer" className="line-clamp-2 text-sm font-medium">{d.title || d.asin}</a>
                 <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-muted">
                   <span>{shortCondition(d.used_condition)}</span>
+                  <RefBadge d={d} />
                   <TriageBadge d={d} />
                 </div>
               </div>

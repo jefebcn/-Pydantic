@@ -23,11 +23,14 @@ Flusso dello scanner (`scraper/main.py`):
 3. Salva lo snapshot in `price_snapshots`.
 4. Legge `deals_v` e manda l'avviso se il prodotto supera le soglie in `settings`.
 
-Dati della dashboard: `components/DataProvider.tsx` carica `/api/deals` e `/api/inventory` ogni 60 s, gestisce le notifiche del browser e espone le azioni (triage offerte, CRUD magazzino, impostazioni). Il SQL è tutto in un solo file (`supabase/schema.sql`), idempotente.
+Dati della dashboard: `components/DataProvider.tsx` carica `/api/deals` e, per l'admin, `/api/inventory` ogni 60 s, gestisce le notifiche del browser e espone le azioni (triage offerte, CRUD magazzino, impostazioni). Il SQL è tutto in un solo file (`supabase/schema.sql`), idempotente.
 
 ## Regole
 - Il calcolo del margine sta **solo** nella vista SQL `deals_v`, il profitto del magazzino solo in `inventory_v`. Scanner e dashboard le leggono, non ricalcolano.
 - Offerte con `triage` ignorato o acquistato non generano avvisi.
+- Offerta attiva = vista entro 6 ore dall'ultimo giro dello scanner (`app/api/deals/route.ts`, `bot.live_deals`), non il campo `active` di `deals_v` (3 ore da adesso): con le ricerche a rotazione e a PC spento le offerte sparirebbero tutte.
+- Riferimento dubbio = il nuovo viene solo da altri venditori, o uno di loro vende sotto il 95% del prezzo Amazon (`refIssue` in `lib/format.ts`, `ref_warning` in `scraper/notify.py`). Il margine resta quello di `deals_v`; il sito mostra "da verificare" e non conta queste offerte nei numeri in evidenza, gli avvisi hanno una riga ⚠️.
+- Lo scanner gira in una sola istanza (porta locale `INSTANCE_PORT`) e scrive in `scraper/scanner.log`; `avvia-scanner.bat` lo fa ripartire se si chiude.
 - Scraping educato: pause casuali, niente rotazione proxy, niente risoluzione CAPTCHA o verifiche anti-robot (AWS WAF, Akamai `bm-verify`). Se arrivano ci si ferma: `scraper/pace.py` rallenta il profilo (`SCAN_SPEED` lento/normale/veloce in `config.SPEED_PROFILES`) e raddoppia la pausa; risale dopo cicli puliti.
 - Il parsing HTML (`scraper/amazon.py`, funzioni `parse_*`) deve restare puro e coperto da `scraper/tests/`. Quando Amazon cambia layout, aggiungere l'HTML reale (da `--debug`) come fixture.
 - La service role key di Supabase si usa solo lato server: route handler e scanner, mai nei componenti client.
