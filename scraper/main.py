@@ -218,7 +218,7 @@ def main() -> None:
     store = Store()
     if config.TELEGRAM_BOT_TOKEN:
         threading.Thread(target=bot.run_forever, args=(store,), daemon=True, name="telegram-bot").start()
-        log("bot Telegram: comandi /top /stato /chatid /help attivi")
+        log("bot Telegram: comandi " + " ".join(f"/{c}" for c, _ in bot.COMMANDS) + " attivi")
     state = load_state()
     configured = config.SCAN_SPEED
     log(f"avvio — {len(config.SEARCHES)} ricerche, velocità massima '{configured}', "
