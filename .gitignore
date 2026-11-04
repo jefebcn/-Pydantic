@@ -37,5 +37,6 @@ scraper/.cache.json
 scraper/debug/
 scraper/.state.json
 scraper/.published.json
+scraper/.subscribers.json
 scraper/*.tmp
 scraper/scanner.log*

@@ -1,12 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ADMIN_COOKIE, isAdmin } from "@/lib/auth";
+import { LIVE_MS } from "@/lib/format";
 import { supabaseAdmin, supabaseHost } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
-
-// Un'offerta è attiva se vista entro 6 ore dall'ultimo giro dello scanner: con le ricerche a rotazione
-// (a velocità lenta il giro completo dura 4 ore) e a PC spento non sparisce tutto. Come in scraper/bot.py.
-const LIVE_MS = 6 * 3600e3;
 
 /** Offerte viste negli ultimi 7 giorni (attive e non), più impostazioni e stato scanner. */
 export async function GET(req: NextRequest) {

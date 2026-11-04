@@ -25,6 +25,13 @@ export interface Deal {
   active: boolean;
 }
 
+export interface PricePoint {
+  checked_at: string;
+  used_price: number | null;
+  new_price: number | null;
+  new_price_any: number | null;
+}
+
 export interface Settings {
   discount_pct: number;
   min_used_price: number;

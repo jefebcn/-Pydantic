@@ -34,7 +34,7 @@ def test_buttons_and_helpers(monkeypatch):
     monkeypatch.setattr(config, "DASHBOARD_URL", "https://pydantic.vercel.app/")
     [[amazon, dash]] = deal_buttons(DEAL)
     assert amazon["url"] == "https://www.amazon.it/dp/B0TEST0001"
-    assert dash["url"] == "https://pydantic.vercel.app/offerte"
+    assert dash["url"] == "https://pydantic.vercel.app/offerte/B0TEST0001"
     assert eur(1234.5) == "1.234,50 €" and eur(None) == "—"
 
 
@@ -83,8 +83,9 @@ def test_channel_post_has_card_and_no_triage_buttons(monkeypatch):
     assert send_channel(VERIFIED, 22)
     (chat, jpeg, payload), = uploads
     assert chat == "-100777" and jpeg == b"jpeg" and "MARGINE" in payload["caption"]
-    [[amazon, site]] = payload["reply_markup"]["inline_keyboard"]
-    assert amazon["url"].endswith("/dp/B0TEST0001") and site["text"] == "📊 Tutte le offerte"
+    [[amazon, site], [follow]] = payload["reply_markup"]["inline_keyboard"]
+    assert amazon["url"].endswith("/dp/B0TEST0001") and site["url"].endswith("/offerte/B0TEST0001")
+    assert follow["url"].endswith("?start=w_B0TEST0001")
 
 
 def test_service_messages_never_reach_the_channel(monkeypatch):
@@ -140,3 +141,18 @@ def test_group_gets_no_triage_buttons_and_photo_falls_back_to_text(monkeypatch):
     private, group = calls[1][2]["reply_markup"]["inline_keyboard"], calls[3][2]["reply_markup"]["inline_keyboard"]
     assert private[1][0]["callback_data"] == "t:interessante:B0TEST0001" and len(group) == 1
     assert calls[3][3] == 7
+
+
+def test_hunter_score():
+    """Gli stessi casi valgono per hunterScore in lib/format.ts."""
+    from scraper.notify import hunter_score, score_label
+    verified = {"new_price": 1000.0, "new_price_any": 1000.0}
+    top = {**verified, "margin_pct": 61, "profit_eur": 428, "used_condition": "Usato - Condizioni accettabili"}
+    assert hunter_score(top) == 85 and score_label(top) == "Affare top"
+    sony = {**verified, "margin_pct": 44, "profit_eur": 353, "used_condition": "Usato - Come nuovo"}
+    assert hunter_score(sony) == 87
+    low = {**verified, "margin_pct": 24, "profit_eur": 97, "used_condition": "Usato - Buone condizioni"}
+    assert hunter_score(low) == 40 and score_label(low) == "Buono"
+    assert hunter_score({**verified, "margin_pct": -5, "profit_eur": -20}) == 8                # senza condizioni né guadagno
+    doubtful = {**top, "new_price": None}
+    assert hunter_score(doubtful) == 40 and score_label(doubtful) == "Da verificare"

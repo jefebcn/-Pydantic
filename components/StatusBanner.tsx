@@ -19,7 +19,7 @@ export function StatusBanner() {
   if (!error) return null;
   const setup = /SUPABASE_URL|SERVICE_ROLE|relation|does not exist|schema cache/i.test(error);
   return (
-    <div className="mb-5 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
+    <div className="mb-5 rounded-3xl bg-red-50 p-4 text-sm text-red-700">
       {setup ? (
         <>
           <b>Database non ancora collegato.</b> Crea il progetto Supabase, esegui <code>supabase/schema.sql</code> e

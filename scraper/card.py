@@ -8,7 +8,8 @@ from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
-from .notify import eur
+from . import config
+from .notify import eur, hunter_score, ref_warning
 
 S = 2                # si disegna al doppio e si riduce: bordi e testi vengono puliti
 W, H = 1280, 720     # misura massima che Telegram mantiene nitida
@@ -85,7 +86,7 @@ def base_canvas() -> Image.Image:
     return Image.blend(img, glow.filter(ImageFilter.GaussianBlur(130 * S)), 0.75)
 
 
-def _product_panel(img: Image.Image, draw, photo: bytes, condition: str, previous: str | None) -> None:
+def _product_panel(img: Image.Image, draw, photo: bytes, condition: str, previous: str | None, score: int | None = None) -> None:
     x, y, w, h = 28, 28, 520, 664
     _box(draw, x, y, w, h, 34, WHITE)
     product = Image.open(io.BytesIO(photo)).convert("RGBA")
@@ -96,9 +97,15 @@ def _product_panel(img: Image.Image, draw, photo: bytes, condition: str, previou
     img.paste(product, ((x * S) + ((w * S - product.width) // 2), ((y + 70) * S) + (((h - 170) * S - product.height) // 2)), product)
     if previous:
         fnt = font("bold", 24)
-        label = f"PREZZO SCESO da {previous}"
+        label = f"SCESO da {previous}"
         _box(draw, x + 20, y + 20, draw.textlength(label, font=fnt) / S + 36, 48, 24, AMBER)
         _text(draw, (x + 38, y + 44), label, fnt, INK, "lm")
+    if score is not None:
+        fnt = font("black", 24)
+        label = f"VOTO {score}"
+        width = draw.textlength(label, font=fnt) / S + 36
+        _box(draw, x + w - 20 - width, y + 20, width, 48, 24, INK)
+        _text(draw, (x + w - 20 - width / 2, y + 44), label, fnt, WHITE, "mm")
     fnt = fit(draw, condition, "semibold", 26, w - 96)
     label_w = draw.textlength(condition, font=fnt) / S + 44
     _box(draw, x + (w - label_w) / 2, y + h - 72, label_w, 50, 25, "#f0f1f5")
@@ -130,7 +137,8 @@ def render_card(d: dict, discount_pct: float, photo: bytes, previous: float | No
     img = base_canvas()
     draw = ImageDraw.Draw(img)
     condition = re.sub(r"^usato\s*[-–]\s*", "", d.get("used_condition") or "", flags=re.I)
-    _product_panel(img, draw, photo, f"Usato · {condition}" if condition else "Usato", eur(previous) if previous else None)
+    _product_panel(img, draw, photo, f"Usato · {condition}" if condition else "Usato", eur(previous) if previous else None,
+                   None if ref_warning(d) else hunter_score(d))
 
     x, right = 580, W - 28
     width = right - x
@@ -149,6 +157,71 @@ def render_card(d: dict, discount_pct: float, photo: bytes, previous: float | No
     _profit_card(draw, x, 456, width, 236, f"+{eur(d.get('profit_eur'), 0)}",
                  f"Con sconto {discount_pct:.0f}% paghi {eur(d.get('your_cost'))}", float(d["margin_pct"]))
 
+    return _jpeg(img)
+
+
+def _jpeg(img: Image.Image) -> bytes:
     out = io.BytesIO()
     img.resize((W, H), Image.Resampling.LANCZOS).save(out, "JPEG", quality=92, optimize=True)
     return out.getvalue()
+
+
+def _rounded_paste(img: Image.Image, source: Image.Image, x: int, y: int, size: int, radius: int) -> None:
+    source = source.convert("RGB").resize((size * S, size * S), Image.Resampling.LANCZOS)
+    mask = Image.new("L", source.size, 0)
+    ImageDraw.Draw(mask).rounded_rectangle((0, 0, source.width - 1, source.height - 1), radius * S, fill=255)
+    img.paste(source, (x * S, y * S), mask)
+
+
+def render_banner() -> bytes:
+    """Copertina del bot: compare in tutte le schermate che non mostrano un'offerta."""
+    img = base_canvas()
+    draw = ImageDraw.Draw(img)
+    _rounded_paste(img, Image.open(config.ROOT / "assets" / "bot_avatar.jpg"), 64, 60, 132, 34)
+    _text(draw, (222, 62), "Second Hand Hunter", font("black", 66), WHITE)
+    _text(draw, (224, 150), "Il tuo cacciatore di affari su Amazon", font("semibold", 34), AMBER)
+    _text(draw, (64, 236), "Dimmi cosa cerchi e quanto vuoi spendere: al resto penso io.", font("regular", 36), MUTED)
+    items = [(SKY, "Sfoglia", "Le migliori", "offerte di adesso"),
+             (LILAC, "Segui", "I prezzi", "ti avviso se calano"),
+             (MINT, "Su misura", "I tuoi avvisi", "budget e categorie")]
+    gap, x, y, h = 22, 64, 318, 340
+    w = (W - 2 * x - 2 * gap) // 3
+    for i, (fill, label, big, small) in enumerate(items):
+        cx = x + i * (w + gap)
+        _box(draw, cx, y, w, h, 34, fill)
+        _text(draw, (cx + 34, y + 36), label, fit(draw, label, "semibold", 30, w - 68), INK_SOFT)
+        _text(draw, (cx + 34, y + 176), big, fit(draw, big, "black", 52, w - 68), INK, "ls")
+        _text(draw, (cx + 34, y + 236), small, fit(draw, small, "semibold", 30, w - 68), INK, "ls")
+    return _jpeg(img)
+
+
+def render_digest(deals: list[dict], photos: dict[str, bytes], day: str) -> bytes:
+    """Il meglio del giorno per il canale: fino a tre offerte una sotto l'altra. `photos` ha le foto già scaricate."""
+    img = base_canvas()
+    draw = ImageDraw.Draw(img)
+    _text(draw, (40, 34), BRAND, font("black", 25), AMBER)
+    _text(draw, (W - 40, 34), day.upper(), font("semibold", 24), MUTED, "ra")
+    _text(draw, (40, 68), "Il meglio di oggi", font("black", 62), WHITE)
+    x, y, w, h, gap = 28, 166, W - 56, 170, 16
+    for i, d in enumerate(deals[:3]):
+        top = y + i * (h + gap)
+        _box(draw, x, top, w, h, 30, WHITE)
+        photo = photos.get(d["asin"])
+        if photo:
+            product = Image.open(io.BytesIO(photo)).convert("RGBA")
+            product.thumbnail(((h - 32) * S, (h - 32) * S), Image.Resampling.LANCZOS)
+            img.paste(product, ((x + 20) * S + ((h - 32) * S - product.width) // 2,
+                                (top + 16) * S + ((h - 32) * S - product.height) // 2), product)
+        text_x = x + h + 8
+        title_font = font("bold", 31)
+        for j, line in enumerate(wrap(draw, clean_title(d.get("title") or d["asin"]), title_font, 620, 2)):
+            _text(draw, (text_x, top + 24 + j * 42), line, title_font, INK)
+        condition = re.sub(r"^usato\s*[-–]\s*", "", d.get("used_condition") or "", flags=re.I)
+        note = f"Seconda Mano {eur(d.get('used_price'))}" + (f" · {condition}" if condition else "")
+        _text(draw, (text_x, top + h - 28), note, fit(draw, note, "semibold", 24, 620), INK_SOFT, "ls")
+        side = x + w - 244
+        _box(draw, side, top + 16, 228, h - 32, 24, MINT)
+        profit = f"+{eur(d.get('profit_eur'), 0)}"
+        _text(draw, (side + 114, top + 66), profit, fit(draw, profit, "black", 46, 200), INK, "mm")
+        _text(draw, (side + 114, top + 116), f"margine {float(d['margin_pct']):.0f}%", font("semibold", 24), INK_SOFT, "mm")
+    return _jpeg(img)

@@ -17,6 +17,12 @@ NEW_LOW_DROP = 0.01  # entro 24 ore si riavvisa solo se il prezzo scende almeno 
 CHEAPER_NEW = 0.95   # un nuovo di altri venditori sotto il 95% del prezzo Amazon rende il riferimento dubbio
 CHANNEL_REPOST_DAYS = 7     # il canale ripropone un'offerta già pubblicata solo dopo una settimana o se cala
 QUIET_HOURS = (23, 8)       # di notte i post del canale arrivano senza suono
+# Voto Hunter, 0-100 (come hunterScore in lib/format.ts): margine fino a 50 punti, guadagno fino a 30, condizioni fino a 20
+SCORE_MARGIN_FULL = 60      # margine % che vale tutti i punti
+SCORE_PROFIT_FULL = 300     # guadagno in € che vale tutti i punti
+SCORE_CONDITIONS = (("come nuovo", 20), ("ottime", 15), ("buone", 10), ("accettabil", 5))
+SCORE_CONDITION_UNKNOWN = 8
+SCORE_DOUBTFUL_MAX = 40     # con un prezzo del nuovo da verificare il voto non sale oltre
 
 
 def parse_chats(raw: str) -> list[tuple[str, int | None]]:
@@ -30,10 +36,11 @@ def parse_chats(raw: str) -> list[tuple[str, int | None]]:
     return out
 
 
-def _request(method: str, **kw) -> bool:
-    """Una chiamata alla Bot API. Se Telegram chiede di rallentare aspetta il tempo indicato e riprova una volta."""
+def api(method: str, **kw) -> dict | None:
+    """Una chiamata alla Bot API: la risposta se Telegram accetta, altrimenti None.
+    Se Telegram chiede di rallentare aspetta il tempo indicato e riprova una volta."""
     if not config.TELEGRAM_BOT_TOKEN:
-        return False
+        return None
     url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/{method}"
     try:
         r = requests.post(url, timeout=30, **kw)
@@ -41,9 +48,13 @@ def _request(method: str, **kw) -> bool:
             wait = r.json().get("parameters", {}).get("retry_after", 5)
             time.sleep(min(wait, RETRY_MAX_S))
             r = requests.post(url, timeout=30, **kw)
-        return r.ok
+        return r.json() if r.ok else None
     except (requests.RequestException, ValueError):
-        return False
+        return None
+
+
+def _request(method: str, **kw) -> bool:
+    return api(method, **kw) is not None
 
 
 def call(method: str, body: dict) -> bool:
@@ -113,14 +124,24 @@ def send_deal(d: dict, discount_pct: float, previous: float | None = None) -> bo
     return sent
 
 
+def send_personal(chat: str, d: dict, caption: str, card: bytes | None, rows: list, silent: bool) -> bool:
+    """Avviso su misura a una persona che usa il bot."""
+    return _deliver(chat, None, d, caption, card, {"reply_markup": {"inline_keyboard": rows}, "disable_notification": silent})
+
+
+def fresh_or_lower(price: float, last: dict | None, now: float) -> bool:
+    """Niente doppioni: `last` è l'ultima uscita di questo prodotto ({"price", "ts"}).
+    Si ripropone se il prezzo cala o dopo CHANNEL_REPOST_DAYS."""
+    if not last or now - last["ts"] > CHANNEL_REPOST_DAYS * 86400:
+        return True
+    return is_new_low(price, last["price"])
+
+
 def channel_wants(d: dict, price: float, published: dict | None, now: float) -> bool:
-    """Il canale è pubblico: solo prezzi verificati e niente doppioni. `published` è la sua ultima uscita
-    per questo prodotto ({"price", "ts"}): si ripubblica se il prezzo cala o dopo CHANNEL_REPOST_DAYS."""
+    """Il canale è pubblico: solo prezzi verificati e niente doppioni."""
     if not config.TELEGRAM_CHANNEL_ID or ref_warning(d):
         return False
-    if not published or now - published["ts"] > CHANNEL_REPOST_DAYS * 86400:
-        return True
-    return is_new_low(price, published["price"])
+    return fresh_or_lower(price, published, now)
 
 
 def is_quiet_hour(hour: int) -> bool:
@@ -130,8 +151,8 @@ def is_quiet_hour(hour: int) -> bool:
 
 def send_channel(d: dict, discount_pct: float, previous: float | None = None) -> bool:
     """Post nel canale pubblico TELEGRAM_CHANNEL_ID: card, didascalia e pulsanti, senza ☆ e ✕."""
-    extra = {"reply_markup": {"inline_keyboard": deal_buttons(d, site_label="📊 Tutte le offerte")},
-             "disable_notification": is_quiet_hour(datetime.now().hour)}
+    rows = deal_buttons(d) + [[{"text": "🔔 Avvisami se il prezzo scende", "url": bot_link(f"w_{d['asin']}")}]]
+    extra = {"reply_markup": {"inline_keyboard": rows}, "disable_notification": is_quiet_hour(datetime.now().hour)}
     return _deliver(config.TELEGRAM_CHANNEL_ID, None, d, format_deal(d, discount_pct, previous),
                     deal_card(d, discount_pct, previous), extra)
 
@@ -151,6 +172,28 @@ def ref_warning(d: dict) -> str | None:
     return None
 
 
+def hunter_score(d: dict) -> int:
+    """Un solo numero per confrontare le offerte. Legge il margine di deals_v, non lo ricalcola."""
+    margin = max(0.0, min(float(d.get("margin_pct") or 0), SCORE_MARGIN_FULL))
+    profit = max(0.0, min(float(d.get("profit_eur") or 0), SCORE_PROFIT_FULL))
+    state = (d.get("used_condition") or "").lower()
+    condition = next((p for word, p in SCORE_CONDITIONS if word in state), SCORE_CONDITION_UNKNOWN)
+    score = int(margin / SCORE_MARGIN_FULL * 50 + profit / SCORE_PROFIT_FULL * 30 + condition + 0.5)
+    return min(score, SCORE_DOUBTFUL_MAX) if ref_warning(d) else score
+
+
+def score_label(d: dict) -> str:
+    if ref_warning(d):
+        return "Da verificare"
+    score = hunter_score(d)
+    return "Affare top" if score >= 80 else "Ottimo" if score >= 60 else "Buono" if score >= 40 else "Discreto"
+
+
+def bot_link(start: str = "") -> str:
+    """Link che apre il bot; `start` porta direttamente a una schermata (vedi bot.deep_link)."""
+    return f"https://t.me/{config.TELEGRAM_BOT_USERNAME}" + (f"?start={start}" if start else "")
+
+
 def big_image(url: str | None) -> str | None:
     """Miniatura Amazon (es. ..._AC_UY218_.jpg) → versione da 1000 px."""
     if not url:
@@ -165,7 +208,8 @@ def eur(v, digits: int = 2) -> str:
     return f"{s} €"
 
 
-def format_deal(d: dict, discount_pct: float, previous: float | None = None) -> str:
+def format_deal(d: dict, discount_pct: float, previous: float | None = None, checked: str | None = None) -> str:
+    """Didascalia di un'offerta. `checked` sostituisce "Controllato alle…" quando il controllo non è di adesso."""
     margin = float(d["margin_pct"])
     head = "🚀" if margin >= 50 else "🔥" if margin >= 40 else "💡"
     title = html.escape((d.get("title") or d["asin"])[:150])
@@ -175,6 +219,7 @@ def format_deal(d: dict, discount_pct: float, previous: float | None = None) -> 
     return "\n".join([
         f"{head} <b>MARGINE {margin:.0f}%</b>  ·  <b>+{eur(d.get('profit_eur'), 0)}</b>",
         f"<b>{title}</b>",
+        f"⭐ Voto Hunter <b>{hunter_score(d)}</b>/100 · {score_label(d)}",
         "",
         *([f"📉 <b>Prezzo sceso</b> da <s>{eur(previous)}</s>"] if previous else []),
         f"💰 Seconda Mano: <b>{eur(d.get('used_price'))}</b>",
@@ -183,14 +228,18 @@ def format_deal(d: dict, discount_pct: float, previous: float | None = None) -> 
         *([f"📦 Usato: {html.escape(condition)}"] if condition else []),
         *([f"⚠️ {html.escape(warning)}"] if warning else []),
         "",
-        f"{f'#{tag} · ' if tag else ''}🕒 Controllato alle {datetime.now():%H:%M}",
+        f"{f'#{tag} · ' if tag else ''}🕒 {checked or f'Controllato alle {datetime.now():%H:%M}'}",
     ])
 
 
-def deal_buttons(d: dict, triage: bool = False, site_label: str = "📊 Gestionale") -> list:
+def deal_url(asin: str) -> str:
+    return f"{config.DASHBOARD_URL.rstrip('/')}/offerte/{asin}"
+
+
+def deal_buttons(d: dict, triage: bool = False) -> list:
     row = [{"text": "🛒 Apri su Amazon", "url": f"{config.BASE_URL}/dp/{d['asin']}"}]
     if config.DASHBOARD_URL:
-        row.append({"text": site_label, "url": f"{config.DASHBOARD_URL.rstrip('/')}/offerte"})
+        row.append({"text": "📊 Analisi completa", "url": deal_url(d["asin"])})
     return [row, triage_row(d["asin"])] if triage else [row]
 
 

@@ -1,10 +1,12 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Badge, Button, Thumb } from "./ui";
 import { IconArrowUpRight, IconCart, IconStar, IconUndo, IconX } from "./icons";
 import { useData } from "./DataProvider";
 import { InventoryModal } from "./InventoryModal";
+import { ScoreBadge } from "./Score";
 import type { Deal, InventoryInput } from "@/lib/types";
 import { ago, amazonUrl, byPriceBand, eur, marginTone, refIssue, shortCondition } from "@/lib/format";
 
@@ -22,7 +24,7 @@ function RefBadge({ d }: { d: Deal }) {
   return <span title={`${issue}: il margine reale può essere più basso`}><Badge tone="amber">⚠ Da verificare</Badge></span>;
 }
 
-function Actions({ d, onBuy }: { d: Deal; onBuy: () => void }) {
+export function Actions({ d, onBuy, amazon = true }: { d: Deal; onBuy: () => void; amazon?: boolean }) {
   const { setTriage, admin } = useData();
   const starred = d.triage === "interessante";
   const ignored = d.triage === "ignorato";
@@ -44,21 +46,27 @@ function Actions({ d, onBuy }: { d: Deal; onBuy: () => void }) {
           </Button>
         </>
       )}
-      <a href={amazonUrl(d.asin)} target="_blank" rel="noreferrer"
-        className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full bg-ink px-3 text-xs font-semibold text-white hover:bg-ink/85">
-        Amazon <IconArrowUpRight size={13} />
-      </a>
+      {amazon && (
+        <a href={amazonUrl(d.asin)} target="_blank" rel="noreferrer"
+          className="inline-flex h-8 items-center gap-1 whitespace-nowrap rounded-full bg-ink px-3 text-xs font-semibold text-white hover:bg-ink/85">
+          Amazon <IconArrowUpRight size={13} />
+        </a>
+      )}
     </div>
   );
 }
 
+/** Dati con cui l'acquisto di un'offerta entra in magazzino. */
+export const buyInput = (d: Deal): InventoryInput => ({
+  asin: d.asin, title: d.title || d.asin, image_url: d.image_url, condition: shortCondition(d.used_condition),
+  list_price: d.used_price, purchase_cost: d.your_cost ?? undefined, ref_price: d.ref_price, status: "ordinato",
+});
+
 export function DealsTable({ deals }: { deals: Deal[] }) {
+  const { settings } = useData();
   const [buying, setBuying] = useState<InventoryInput | null>(null);
-  const buy = (d: Deal) =>
-    setBuying({
-      asin: d.asin, title: d.title || d.asin, image_url: d.image_url, condition: shortCondition(d.used_condition),
-      list_price: d.used_price, purchase_cost: d.your_cost ?? undefined, ref_price: d.ref_price, status: "ordinato",
-    });
+  const buy = (d: Deal) => setBuying(buyInput(d));
+  const costLabel = `Con sconto ${settings?.discount_pct ?? 22}%`;
 
   return (
     <>
@@ -69,7 +77,7 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
             <tr>
               <th className="px-4 pb-2 pt-4 font-medium">Prodotto</th>
               <th className="px-4 pb-2 pt-4 text-right font-medium">Seconda Mano</th>
-              <th className="px-4 pb-2 pt-4 text-right font-medium">Tuo costo</th>
+              <th className="px-4 pb-2 pt-4 text-right font-medium">{costLabel}</th>
               <th className="px-4 pb-2 pt-4 text-right font-medium">Nuovo rif.</th>
               <th className="px-4 pb-2 pt-4 text-right font-medium">Margine</th>
               <th className="px-4 pb-2 pt-4 text-right font-medium">Guadagno</th>
@@ -83,10 +91,11 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                   <div className="flex items-center gap-3">
                     <Thumb src={d.image_url} />
                     <div className="min-w-0">
-                      <a href={amazonUrl(d.asin)} target="_blank" rel="noreferrer" className="line-clamp-1 max-w-[42ch] font-semibold hover:underline" title={d.title || ""}>
+                      <Link href={`/offerte/${d.asin}`} className="line-clamp-1 max-w-[42ch] font-semibold hover:underline" title={d.title || ""}>
                         {d.title || d.asin}
-                      </a>
+                      </Link>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+                        <ScoreBadge d={d} />
                         <Badge>{d.category}</Badge>
                         <span>{shortCondition(d.used_condition)}</span>
                         <span>· {ago(d.first_seen_at)}</span>
@@ -102,7 +111,7 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
                 <td className="border-t border-line px-4 py-3 text-right tabular-nums text-muted" title={`Media 90 gg ${eur(d.avg_new_90d)} · ${d.n_checks} controlli`}>
                   {eur(d.ref_price)}
                 </td>
-                <td className={`px-3 py-2.5 text-right text-base font-bold tabular-nums ${marginTone(d.margin_pct)}`}>{d.margin_pct?.toFixed(0)}%</td>
+                <td className={`border-t border-line px-4 py-3 text-right text-base font-bold tabular-nums ${marginTone(d.margin_pct)}`}>{d.margin_pct?.toFixed(0)}%</td>
                 <td className="border-t border-line px-4 py-3 text-right font-semibold tabular-nums text-gain">+{eur(d.profit_eur, 0)}</td>
                 <td className="border-t border-line px-4 py-3"><Actions d={d} onBuy={() => buy(d)} /></td>
               </tr>
@@ -118,8 +127,9 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
             <div className="flex gap-3">
               <Thumb src={d.image_url} size={56} />
               <div className="min-w-0 flex-1">
-                <a href={amazonUrl(d.asin)} target="_blank" rel="noreferrer" className="line-clamp-2 text-sm font-medium">{d.title || d.asin}</a>
-                <div className="mt-1 flex flex-wrap gap-1.5 text-[11px] text-muted">
+                <Link href={`/offerte/${d.asin}`} className="line-clamp-2 text-sm font-medium">{d.title || d.asin}</Link>
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
+                  <ScoreBadge d={d} />
                   <span>{shortCondition(d.used_condition)}</span>
                   <RefBadge d={d} />
                   <TriageBadge d={d} />
@@ -132,7 +142,7 @@ export function DealsTable({ deals }: { deals: Deal[] }) {
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
               <div><div className="text-muted">Usato</div><div className="tabular-nums">{eur(d.used_price)}</div></div>
-              <div><div className="text-muted">Tuo costo</div><div className="font-semibold tabular-nums">{eur(d.your_cost)}</div></div>
+              <div><div className="text-muted">{costLabel}</div><div className="font-semibold tabular-nums">{eur(d.your_cost)}</div></div>
               <div><div className="text-muted">Nuovo</div><div className="tabular-nums">{eur(d.ref_price)}</div></div>
             </div>
             <div className="mt-2.5 border-t border-line pt-2.5"><Actions d={d} onBuy={() => buy(d)} /></div>

@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useData } from "./DataProvider";
 import { IconBell, IconBox, IconChevronDown, IconGrid, IconLock, IconLogout, IconSliders, IconTag } from "./icons";
-import { ago, isScannerOn } from "@/lib/format";
+import { CHANNEL_URL, ago, botLink, isScannerOn } from "@/lib/format";
 
 const NAV = [
   { href: "/", label: "Panoramica", Icon: IconGrid, admin: false },
@@ -105,6 +105,23 @@ export function UserControls() {
   );
 }
 
+function Footer() {
+  const { settings } = useData();
+  return (
+    <footer className="mt-12 border-t border-line pt-5 text-xs leading-relaxed text-muted">
+      <p className="max-w-[80ch]">
+        Guadagni e margini sono stime: suppongono di comprare con lo sconto del {settings?.discount_pct ?? 22}% e rivendere al prezzo del nuovo,
+        prima delle spese. I prezzi cambiano in fretta, controlla sempre su Amazon prima di comprare.
+        Sito indipendente, non collegato ad Amazon.
+      </p>
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 font-medium">
+        <a href={CHANNEL_URL} target="_blank" rel="noreferrer" className="hover:text-ink">Canale Telegram</a>
+        <a href={botLink()} target="_blank" rel="noreferrer" className="hover:text-ink">Bot Telegram</a>
+      </div>
+    </footer>
+  );
+}
+
 export function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   const { admin, logout } = useData();
@@ -156,7 +173,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <div className="text-[11px] text-muted">× Sander Chill House</div>
             </div>
           </header>
-          <main className="px-4 pb-28 pt-5 sm:px-6 lg:px-9 lg:pb-9 lg:pt-8">{children}</main>
+          <main className="px-4 pb-28 pt-5 sm:px-6 lg:px-9 lg:pb-9 lg:pt-8">{children}<Footer /></main>
         </div>
       </div>
 

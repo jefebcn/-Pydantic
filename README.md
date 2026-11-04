@@ -57,6 +57,8 @@ Negli avvisi in chat privata ci sono anche i pulsanti **☆ Interessante** e **�
 
 Il segno ⚠️ (sul sito "da verificare") vuol dire che il prezzo del nuovo può essere gonfiato: viene solo da altri venditori, oppure uno di loro vende a meno di Amazon. In quel caso il margine reale può essere più basso.
 
+**Chi usa il bot in privato** non deve configurare nulla: `/start` apre un menu con le offerte da sfogliare, i filtri per budget e categoria, gli avvisi su misura e i prodotti di cui seguire il prezzo. Le preferenze restano solo sul PC dello scanner, in `scraper/.subscribers.json`: se il file si perde, chi usa il bot deve rifare le sue scelte.
+
 **Canale pubblico:** aggiungi il bot come amministratore del canale, metti l'ID (te lo dà `/chatid` scritto nel canale) in `TELEGRAM_CHANNEL_ID` e riavvia lo scanner. Il canale riceve solo le offerte con prezzo verificato, una volta sola (di nuovo se il prezzo cala o dopo 7 giorni), senza pulsanti ☆ e ✕ né messaggi di servizio. La descrizione del canale si imposta con `python -m scraper.main --telegram-setup`.
 
 **Gruppo dedicato agli avvisi:** crea il gruppo, aggiungi il bot. Il bot scrive da solo l'ID del gruppo; aggiungilo a `TELEGRAM_CHAT_ID` separato da virgola (es. `8498296680,-1001234567890`) e riavvia lo scanner. In un gruppo con argomenti usa `id_gruppo:id_topic` (te lo dà `/chatid` scritto nel topic). La foto del gruppo può essere la stessa del bot.

@@ -24,9 +24,9 @@ import traceback
 from datetime import datetime
 from pathlib import Path
 
-from . import bot, config, pace
+from . import bot, config, digest, pace, subscribers
 from .amazon import AmazonClient, CaptchaError, LocationError, SearchItem
-from .notify import channel_wants, is_new_low, send_channel, send_deal, telegram
+from .notify import channel_wants, is_new_low, parse_chats, send_channel, send_deal, telegram
 
 ALREADY_RUNNING = 3            # codice di uscita: avvia-scanner.bat non riparte
 INSTANCE_PORT = 47853          # porta locale tenuta occupata finché lo scanner gira
@@ -148,7 +148,8 @@ def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
     todo = todo[:prof["max_offer_fetches"]]
     log(f"{len(found)} prodotti trovati, controllo offerte su {len(todo)}")
 
-    alerts = posts = 0
+    alerts = posts = personal = 0
+    linked = {chat for chat, _ in parse_chats(config.TELEGRAM_CHAT_ID)}
     for it, _cat in todo:
         try:
             summary = client.offers(it.asin)
@@ -170,14 +171,19 @@ def run_cycle(client: AmazonClient, store, prof: dict, state: dict) -> None:
         log(f"  {it.asin} usato {used_price}€ | nuovo {d['ref_price']}€ | margine {margin:.0f}% (+{profit:.0f}€)")
         if d.get("triage") in ("ignorato", "acquistato"):
             continue
-        if margin >= min_margin and profit >= min_profit:
+        above = margin >= min_margin and profit >= min_profit
+        if above:
             floor = store.alert_floor(it.asin)
             if is_new_low(used_price, floor) and send_deal(d, discount, previous=floor):  # senza Telegram non segna nulla
                 alerts += 1
                 store.mark_alerted(it.asin, used_price)
             posts += publish_to_channel(d, used_price, discount)
+        try:  # chi riceve già tutti gli avvisi sopra soglia non li riceve due volte
+            personal += subscribers.dispatch(d, used_price, discount, min_profit, skip=linked if above else ())
+        except Exception as e:
+            log(f"  {it.asin}: errore negli avvisi su misura ({e!r})")
 
-    log(f"ciclo finito: {alerts} avvisi inviati, {posts} post nel canale")
+    log(f"ciclo finito: {alerts} avvisi inviati, {posts} post nel canale, {personal} avvisi su misura")
 
 
 def cmd_test(asin: str) -> None:
@@ -286,6 +292,13 @@ def main() -> None:
             reached = pace.on_clean_cycle(state, configured)
             if reached:
                 log(f"{config.STEP_UP_AFTER_CYCLES} cicli senza blocchi: velocità '{reached}'")
+            if digest.due(state, datetime.now()):
+                try:
+                    if digest.post_digest(store, load_published()):
+                        state["digest_date"] = datetime.now().date().isoformat()
+                        log("riepilogo del giorno pubblicato nel canale")
+                except Exception as e:  # non deve mai fermare lo scanner
+                    log(f"errore nel riepilogo del giorno: {e!r}")
         pace.schedule_next(state, prof["cycle_minutes"])
         save_state(state)
         if a.once:

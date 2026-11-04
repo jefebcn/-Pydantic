@@ -110,11 +110,14 @@ SUPABASE_SERVICE_ROLE_KEY = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "").strip()  # canale pubblico: solo offerte con prezzo verificato
+TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "SecondHandHunter_Bot")
+TELEGRAM_CHANNEL_URL = os.getenv("TELEGRAM_CHANNEL_URL", "https://t.me/secondhandhunters")
 DASHBOARD_URL = os.getenv("DASHBOARD_URL", "")
 
 CACHE_FILE = ROOT / ".cache.json"
 STATE_FILE = ROOT / ".state.json"   # ritmo attuale, blocchi, posizione nella rotazione delle ricerche
 PUBLISHED_FILE = ROOT / ".published.json"  # cosa è già uscito nel canale: {asin: {"price", "ts"}}
-LOG_FILE = ROOT / "scanner.log"     # ultimi log dello scanner (ruota a 1 MB), per capire perché si è fermato
+SUBSCRIBERS_FILE = ROOT / ".subscribers.json"  # chi usa il bot: avvisi su misura e prodotti seguiti
+LOG_FILE = ROOT / "scanner.log"    # ultimi log dello scanner (ruota a 1 MB), per capire perché si è fermato
 DEBUG_DIR = ROOT / "debug"
 DEBUG = False   # True con --debug: salva in DEBUG_DIR l'HTML di ogni pagina scaricata

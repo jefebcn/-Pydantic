@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useData } from "@/components/DataProvider";
 import { DealsByBand, DealsTable } from "@/components/DealsTable";
 import { StatusBanner } from "@/components/StatusBanner";
 import { Button, Empty, PageHeader, Skeleton, Tabs, inputCls } from "@/components/ui";
 import type { Deal } from "@/lib/types";
-import { refIssue, shortCondition } from "@/lib/format";
+import { PRICE_BANDS, hunterScore, refIssue, shortCondition } from "@/lib/format";
 
 type View = "attive" | "interessanti" | "tutte" | "ignorate";
 
@@ -17,16 +18,36 @@ const VIEWS: Record<View, (d: Deal) => boolean> = {
   ignorate: (d) => d.triage === "ignorato",
 };
 
-export default function OffersPage() {
+type Sort = "score" | "margin" | "profit" | "recent" | "price";
+
+function Offers() {
   const { deals, loading, refresh, admin } = useData();
-  const [view, setView] = useState<View>("attive");
-  const [q, setQ] = useState("");
-  const [category, setCategory] = useState("");
-  const [condition, setCondition] = useState("");
-  const [minMargin, setMinMargin] = useState(0);
-  const [sort, setSort] = useState<"margin" | "profit" | "recent" | "price">("profit");
-  const [bands, setBands] = useState(true);
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
+  // i filtri stanno nell'indirizzo: tornando indietro da un'offerta restano, e si possono condividere
+  const params = useSearchParams();
+  const [view, setView] = useState<View>((params.get("vista") as View) in VIEWS ? (params.get("vista") as View) : "attive");
+  const [q, setQ] = useState(params.get("q") ?? "");
+  const [category, setCategory] = useState(params.get("cat") ?? "");
+  const [condition, setCondition] = useState(params.get("stato") ?? "");
+  const [minMargin, setMinMargin] = useState(Number(params.get("margine")) || 0);
+  const [sort, setSort] = useState<Sort>((params.get("ordine") as Sort) || "score");
+  const [bands, setBands] = useState(params.get("fasce") !== "0");
+  const [verifiedOnly, setVerifiedOnly] = useState(params.get("verificate") === "1");
+  const [budget, setBudget] = useState(Number(params.get("budget") ?? -1));
+
+  useEffect(() => {
+    const out = new URLSearchParams();
+    if (view !== "attive") out.set("vista", view);
+    if (q) out.set("q", q);
+    if (category) out.set("cat", category);
+    if (condition) out.set("stato", condition);
+    if (minMargin) out.set("margine", String(minMargin));
+    if (sort !== "score") out.set("ordine", sort);
+    if (!bands) out.set("fasce", "0");
+    if (verifiedOnly) out.set("verificate", "1");
+    if (budget >= 0) out.set("budget", String(budget));
+    const qs = out.toString();
+    window.history.replaceState(null, "", qs ? `/offerte?${qs}` : "/offerte");
+  }, [view, q, category, condition, minMargin, sort, bands, verifiedOnly, budget]);
 
   const categories = useMemo(() => [...new Set(deals.map((d) => d.category).filter(Boolean))].sort() as string[], [deals]);
   const conditions = useMemo(
@@ -34,9 +55,9 @@ export default function OffersPage() {
     [deals],
   );
 
-  const list = useMemo(() => {
+  const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    const out = deals.filter(
+    return deals.filter(
       (d) =>
         VIEWS[view](d) &&
         (d.margin_pct ?? -999) >= minMargin &&
@@ -45,14 +66,21 @@ export default function OffersPage() {
         (!verifiedOnly || !refIssue(d)) &&
         (!s || (d.title || "").toLowerCase().includes(s) || d.asin.toLowerCase().includes(s)),
     );
-    const by: Record<typeof sort, (a: Deal, b: Deal) => number> = {
+  }, [deals, view, q, category, condition, minMargin, verifiedOnly]);
+
+  const inBand = (d: Deal, i: number) => (d.used_price ?? 0) >= PRICE_BANDS[i].min && (d.used_price ?? 0) < PRICE_BANDS[i].max;
+
+  const list = useMemo(() => {
+    const out = budget >= 0 && PRICE_BANDS[budget] ? filtered.filter((d) => inBand(d, budget)) : filtered.slice();
+    const by: Record<Sort, (a: Deal, b: Deal) => number> = {
+      score: (a, b) => hunterScore(b) - hunterScore(a),
       margin: (a, b) => (b.margin_pct ?? 0) - (a.margin_pct ?? 0),
       profit: (a, b) => (b.profit_eur ?? 0) - (a.profit_eur ?? 0),
       recent: (a, b) => +new Date(b.first_seen_at) - +new Date(a.first_seen_at),
       price: (a, b) => (b.used_price ?? 0) - (a.used_price ?? 0),
     };
     return out.sort(by[sort]);
-  }, [deals, view, q, category, condition, minMargin, sort, verifiedOnly]);
+  }, [filtered, budget, sort]);
 
   const count = (v: View) => deals.filter(VIEWS[v]).length;
 
@@ -60,7 +88,7 @@ export default function OffersPage() {
     <>
       <PageHeader
         title="Offerte"
-        subtitle={admin ? "Amazon Seconda Mano vs prezzo nuovo · ☆ segna interessante · ✕ ignora · carrello registra l'acquisto" : "Amazon Seconda Mano vs prezzo nuovo, aggiornate ogni minuto"}
+        subtitle={admin ? "Amazon Seconda Mano vs prezzo nuovo · ☆ segna interessante · ✕ ignora · carrello registra l'acquisto" : "Amazon Seconda Mano contro il prezzo del nuovo, dal voto più alto. Tocca un'offerta per l'analisi completa"}
         actions={<Button onClick={refresh}>↻ Aggiorna</Button>}
       />
       <StatusBanner />
@@ -76,6 +104,17 @@ export default function OffersPage() {
         ]}
       />
 
+      <div className="-mx-1 mb-3 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        {[{ label: "Ogni budget", i: -1, n: filtered.length }, ...PRICE_BANDS.map((b, i) => ({ label: b.label, i, n: filtered.filter((d) => inBand(d, i)).length }))]
+          .filter((c) => c.n > 0 || c.i === budget || c.i === -1)
+          .map((c) => (
+            <button key={c.i} onClick={() => setBudget(c.i)}
+              className={`shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium transition-colors ${budget === c.i ? "bg-sky text-ink" : "bg-soft text-muted hover:text-ink"}`}>
+              {c.label} <span className="tabular-nums opacity-60">{c.n}</span>
+            </button>
+          ))}
+      </div>
+
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-8">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cerca titolo o ASIN" className={`${inputCls} col-span-2`} />
         <select value={category} onChange={(e) => setCategory(e.target.value)} className={inputCls}>
@@ -86,7 +125,8 @@ export default function OffersPage() {
           <option value="">Tutte le condizioni</option>
           {conditions.map((c) => <option key={c}>{c}</option>)}
         </select>
-        <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} className={inputCls}>
+        <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className={inputCls}>
+          <option value="score">Ordina: Voto Hunter</option>
           <option value="margin">Ordina: margine %</option>
           <option value="profit">Ordina: guadagno €</option>
           <option value="recent">Ordina: più recenti</option>
@@ -117,5 +157,13 @@ export default function OffersPage() {
         <DealsTable deals={list} />
       )}
     </>
+  );
+}
+
+export default function OffersPage() {
+  return (
+    <Suspense>
+      <Offers />
+    </Suspense>
   );
 }

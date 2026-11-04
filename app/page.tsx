@@ -7,15 +7,15 @@ import { DealsByBand } from "@/components/DealsTable";
 import { StatusBanner } from "@/components/StatusBanner";
 import { TrendChart, type Point } from "@/components/TrendChart";
 import { IconArrowUpRight, IconFilter, IconSend, IconStar } from "@/components/icons";
+import { ScoreBadge } from "@/components/Score";
 import { Badge, Card, Empty, Kpi, PageHeader, PillSelect, SectionTitle, Skeleton, Thumb, type Pastel } from "@/components/ui";
 import { STATUS_LABEL, STATUS_ORDER, type Deal } from "@/lib/types";
-import { amazonUrl, eur, marginTone, pct, refIssue } from "@/lib/format";
+import { CHANNEL_URL, ago, botLink, eur, hunterScore, marginTone, pct, refIssue } from "@/lib/format";
 
-const BOT_URL = "https://t.me/SecondHandHunter_Bot";
 const TOP_COLORS: Pastel[] = ["lilac", "mint", "cream"];
 
 type Range = "24h" | "7g";
-type Sort = "profit" | "margin" | "recent";
+type Sort = "score" | "profit" | "margin" | "recent";
 
 /** Nuove offerte trovate nel tempo: 12 fasce da 2 ore (24h) o 7 giorni. */
 function trend(deals: Deal[], range: Range, now: number): Point[] {
@@ -39,19 +39,18 @@ function trend(deals: Deal[], range: Range, now: number): Point[] {
 function TopCard({ d, color }: { d: Deal; color: Pastel }) {
   const bg = { lilac: "bg-lilac", mint: "bg-mint", cream: "bg-cream", sky: "bg-sky", white: "bg-white" }[color];
   return (
-    <a href={amazonUrl(d.asin)} target="_blank" rel="noreferrer"
-      className={`group flex min-h-[176px] w-[72%] shrink-0 snap-start flex-col rounded-3xl p-4 sm:w-auto transition-transform hover:-translate-y-0.5 ${bg}`}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="text-xl font-extrabold tracking-tight tabular-nums">+{eur(d.profit_eur, 0)}</div>
-        <IconArrowUpRight size={16} className="mt-1 text-ink/40 group-hover:text-ink" />
+    <Link href={`/offerte/${d.asin}`}
+      className={`group flex min-h-[176px] w-[72%] shrink-0 snap-start flex-col rounded-3xl p-3 sm:w-auto transition-transform hover:-translate-y-0.5 ${bg}`}>
+      <div className="relative flex h-28 items-center justify-center rounded-2xl bg-white p-2 lg:h-44">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        {d.image_url && <img src={d.image_url} alt="" className="max-h-full max-w-full object-contain" />}
+        <span className="absolute left-2 top-2"><ScoreBadge d={d} /></span>
+        <IconArrowUpRight size={15} className="absolute right-2 top-2 text-ink/30 group-hover:text-ink" />
       </div>
-      <div className="text-xs text-ink/60 tabular-nums">Seconda Mano {eur(d.used_price, 0)}</div>
-      <div className="mt-2 line-clamp-2 text-xs font-medium text-ink/80">{d.title || d.asin}</div>
-      <div className="mt-auto flex items-end justify-between pt-3">
-        <Thumb src={d.image_url} size={44} className="ring-0" />
-        <span className="text-xs font-semibold text-ink/70 tabular-nums">{pct(d.margin_pct)}</span>
-      </div>
-    </a>
+      <div className="mt-2.5 px-1 text-xl font-extrabold tracking-tight tabular-nums">+{eur(d.profit_eur, 0)}</div>
+      <div className="px-1 text-xs text-ink/60 tabular-nums">{eur(d.used_price, 0)} · margine {pct(d.margin_pct)}</div>
+      <div className="mt-1.5 line-clamp-2 px-1 text-xs font-medium text-ink/80">{d.title || d.asin}</div>
+    </Link>
   );
 }
 
@@ -76,7 +75,7 @@ function MarketTable({ deals }: { deals: Deal[] }) {
             return (
               <tr key={d.asin}>
                 <td className="py-2 pr-3">
-                  <a href={amazonUrl(d.asin)} target="_blank" rel="noreferrer" className="flex items-center gap-3">
+                  <Link href={`/offerte/${d.asin}`} className="flex items-center gap-3">
                     <Thumb src={d.image_url} size={40} />
                     <span className="min-w-0">
                       <span className="line-clamp-1 max-w-[30ch] font-semibold hover:underline">{d.title || d.asin}</span>
@@ -85,7 +84,7 @@ function MarketTable({ deals }: { deals: Deal[] }) {
                         {refIssue(d) && <span title={`${refIssue(d)}: il margine reale può essere più basso`}> · ⚠ da verificare</span>}
                       </span>
                     </span>
-                  </a>
+                  </Link>
                 </td>
                 <td className="whitespace-nowrap py-2 text-right tabular-nums">{eur(d.used_price)}</td>
                 <td className={`whitespace-nowrap py-2 text-right font-semibold tabular-nums ${marginTone(d.margin_pct)}`}>+{pct(d.margin_pct)}</td>
@@ -124,12 +123,18 @@ function TelegramCard() {
           su Telegram!
         </h2>
         <p className="mt-3 max-w-[30ch] text-sm text-white/70">
-          Il bot Seconda Mano Hunter manda foto, margine e link appena compare un affare sopra soglia.
+          Scegli budget e categorie: il bot ti scrive solo per ciò che ti interessa, e ti avvisa se un prezzo che segui scende.
         </p>
-        <a href={BOT_URL} target="_blank" rel="noreferrer"
-          className="mt-6 inline-flex h-10 items-center gap-2 rounded-full bg-skybtn px-5 text-sm font-semibold text-ink shadow-[0_8px_20px_-6px_rgba(181,220,247,0.7)] hover:bg-[#9fd1f4]">
-          <IconSend size={16} /> Apri il bot
-        </a>
+        <div className="relative z-10 mt-6 flex flex-wrap gap-2">
+          <a href={botLink("avvisi")} target="_blank" rel="noreferrer"
+            className="inline-flex h-10 items-center gap-2 rounded-full bg-skybtn px-5 text-sm font-semibold text-ink shadow-[0_8px_20px_-6px_rgba(181,220,247,0.7)] hover:bg-[#9fd1f4]">
+            <IconSend size={16} /> Apri il bot
+          </a>
+          <a href={CHANNEL_URL} target="_blank" rel="noreferrer"
+            className="inline-flex h-10 items-center rounded-full border border-white/25 px-4 text-sm font-semibold text-white hover:bg-white/10">
+            Canale
+          </a>
+        </div>
         {/* carte decorative a filo */}
         <svg className="pointer-events-none absolute -bottom-6 -right-4 w-44 text-white/40" viewBox="0 0 180 140" fill="none" stroke="currentColor" strokeWidth="1.2" aria-hidden>
           <rect x="40" y="30" width="120" height="80" rx="10" transform="rotate(-14 100 70)" />
@@ -137,6 +142,57 @@ function TelegramCard() {
         </svg>
       </div>
     </div>
+  );
+}
+
+const STEPS = [
+  { n: "1", title: "Cerchiamo", text: "Controlliamo di continuo Amazon Seconda Mano, da 100 € in su." },
+  { n: "2", title: "Confrontiamo", text: "Ogni offerta col prezzo del nuovo, e le diamo un voto da 0 a 100." },
+  { n: "3", title: "Scegli tu", text: "Apri l'analisi, prova la tua ipotesi di rivendita e compri su Amazon." },
+];
+
+/** Per chi arriva la prima volta: cos'è questo sito e da dove iniziare. L'admin non ne ha bisogno. */
+function Welcome({ count, best, loading }: { count: number; best: number; loading: boolean }) {
+  const { scanner } = useData();
+  const stats = [
+    { label: "offerte col prezzo verificato", value: String(count) },
+    { label: "il guadagno più alto", value: `+${eur(best, 0)}` },
+    { label: "ultimo controllo", value: ago(scanner.last_check) },
+  ];
+  return (
+    <section className="relative mb-8 overflow-hidden rounded-[32px] bg-frame p-6 text-white sm:p-8">
+      <div aria-hidden className="pointer-events-none absolute -right-24 -top-32 h-96 w-96 rounded-full bg-[#f5a623]/25 blur-3xl" />
+      <div className="relative grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,5fr)]">
+        <div>
+          <p className="text-xs font-bold uppercase tracking-wider text-[#f5a623]">Amazon Seconda Mano, senza perdere tempo</p>
+          <h2 className="mt-2 max-w-[20ch] text-3xl font-extrabold leading-[1.12] tracking-tight sm:text-[40px]">
+            Gli affari che valgono davvero, trovati per te.
+          </h2>
+          <div className="mt-6 flex flex-wrap gap-2">
+            <Link href="/offerte" className="inline-flex h-11 items-center rounded-full bg-white px-5 text-sm font-semibold text-ink hover:bg-white/90">Sfoglia le offerte</Link>
+            <a href={botLink()} target="_blank" rel="noreferrer" className="inline-flex h-11 items-center gap-2 rounded-full border border-white/25 px-5 text-sm font-semibold hover:bg-white/10">
+              <IconSend size={16} /> Avvisi su Telegram
+            </a>
+          </div>
+          <dl className="mt-7 grid grid-cols-3 gap-3">
+            {stats.map((s) => (
+              <div key={s.label}>
+                <dd className="text-lg font-extrabold tracking-tight tabular-nums sm:text-2xl">{loading ? "…" : s.value}</dd>
+                <dt className="mt-0.5 text-[11px] leading-snug text-white/55">{s.label}</dt>
+              </div>
+            ))}
+          </dl>
+        </div>
+        <ol className="grid content-center gap-3">
+          {STEPS.map((s) => (
+            <li key={s.n} className="flex gap-3 rounded-2xl bg-white/[0.06] p-3.5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#f5a623] text-xs font-extrabold text-ink">{s.n}</span>
+              <span className="text-sm leading-snug"><b className="font-bold">{s.title}.</b> <span className="text-white/65">{s.text}</span></span>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
   );
 }
 
@@ -206,21 +262,23 @@ export default function Overview() {
   const { deals, settings, loading, updatedAt, admin } = useData();
   const [range, setRange] = useState<Range>("24h");
   const [marketRange, setMarketRange] = useState<Range>("24h");
-  const [sort, setSort] = useState<Sort>("profit");
+  const [sort, setSort] = useState<Sort>("score");
 
   const k = useMemo(() => {
     const live = deals.filter((d) => d.active && d.triage !== "ignorato" && d.triage !== "acquistato");
     const hot = live.filter(
       (d) => (d.margin_pct ?? 0) >= (settings?.alert_margin_pct ?? 40) && (d.profit_eur ?? 0) >= (settings?.alert_profit_eur ?? 50),
     );
-    const byProfit = live.slice().sort((a, b) => (b.profit_eur ?? 0) - (a.profit_eur ?? 0));
+    const byScore = live.slice().sort((a, b) => hunterScore(b) - hunterScore(a));
     // i numeri in evidenza contano solo i prezzi verificati: un riferimento gonfiato li falserebbe
-    const verified = byProfit.filter((d) => !refIssue(d));
+    const verified = byScore.filter((d) => !refIssue(d));
     const hotVerified = hot.filter((d) => !refIssue(d));
     return {
       live,
       hot,
-      byProfit,
+      byScore,
+      verified: verified.length,
+      bestProfit: verified.reduce((m, d) => Math.max(m, d.profit_eur ?? 0), 0),
       top: verified.slice(0, 3),
       hotVerified: hotVerified.length,
       hotProfit: hotVerified.reduce((s, d) => s + (d.profit_eur ?? 0), 0),
@@ -234,6 +292,7 @@ export default function Overview() {
   const market = useMemo(() => {
     const since = now - (marketRange === "24h" ? 864e5 : 7 * 864e5);
     const by: Record<Sort, (a: Deal, b: Deal) => number> = {
+      score: (a, b) => hunterScore(b) - hunterScore(a),
       profit: (a, b) => (b.profit_eur ?? 0) - (a.profit_eur ?? 0),
       margin: (a, b) => (b.margin_pct ?? 0) - (a.margin_pct ?? 0),
       recent: (a, b) => +new Date(b.first_seen_at) - +new Date(a.first_seen_at),
@@ -246,8 +305,9 @@ export default function Overview() {
     <>
       <PageHeader title="Panoramica" />
       <StatusBanner />
+      {!admin && <Welcome count={k.verified} best={k.bestProfit} loading={loading} />}
 
-      <div className="grid gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <section>
           <SectionTitle>Andamento</SectionTitle>
           <div className="rounded-3xl bg-sky p-5">
@@ -300,7 +360,7 @@ export default function Overview() {
         </section>
       </div>
 
-      <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,4fr)]">
+      <div className="mt-10 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(0,4fr)]">
         <section>
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-bold tracking-tight">
@@ -309,6 +369,7 @@ export default function Overview() {
             <div className="flex gap-2">
               <PillSelect value={marketRange} onChange={setMarketRange} options={[{ value: "24h", label: "24h" }, { value: "7g", label: "7 giorni" }]} />
               <PillSelect value={sort} onChange={setSort} options={[
+                { value: "score", label: "Miglior voto" },
                 { value: "profit", label: "Top guadagno" },
                 { value: "margin", label: "Top margine" },
                 { value: "recent", label: "Più recenti" },
@@ -337,7 +398,7 @@ export default function Overview() {
         {loading ? (
           <Skeleton className="h-64" />
         ) : k.live.length ? (
-          <DealsByBand deals={k.byProfit} limit={5} />
+          <DealsByBand deals={k.byScore} limit={5} />
         ) : (
           <Empty>Nessuna offerta attiva in questo momento.</Empty>
         )}

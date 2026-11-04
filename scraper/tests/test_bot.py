@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from scraper import bot, config
+from scraper import bot, config, subscribers
 from scraper.notify import parse_chats
 
 
@@ -32,6 +32,9 @@ class FakeStore:
             return [{"checked_at": hours_ago(1)}]
         return self.deals
 
+    def deal(self, asin):
+        return next((d for d in self.deals if d["asin"] == asin), None)
+
     def set_triage(self, asin, triage):
         self.triage[asin] = triage
 
@@ -40,8 +43,9 @@ class FakeStore:
 
 
 @pytest.fixture(autouse=True)
-def linked_chat(monkeypatch):
+def linked_chat(monkeypatch, tmp_path):
     monkeypatch.setattr(config, "TELEGRAM_CHAT_ID", "111, -1009:7")
+    monkeypatch.setattr(config, "SUBSCRIBERS_FILE", tmp_path / "subs.json")
 
 
 def msg(text, chat=111, chat_type="private", topic=None):
@@ -61,19 +65,25 @@ def test_command_of():
     assert bot.command_of("ciao") is None
 
 
+def group(text, chat=-1009):
+    return msg(text, chat=chat, chat_type="supergroup")
+
+
 def test_help_and_chatid_answer_everywhere():
-    chat, text, _ = bot.handle_update(msg("/start", chat=555), FakeStore())
-    assert chat == "555" and "/top" in text
+    chat, screen, _ = bot.handle_update(msg("/start", chat=555), FakeStore())
+    assert chat == "555" and isinstance(screen, bot.Screen) and "Ciao" in screen.caption
+    _, text, _ = bot.handle_update(group("/start", chat=-555), FakeStore())
+    assert "/top" in text
     chat, text, topic = bot.handle_update(msg("/chatid", chat=-1009, chat_type="supergroup", topic=7), FakeStore())
     assert "<code>-1009:7</code>" in text and "già collegata" in text and topic == 7
 
 
-def test_top_and_stato_only_in_linked_chats():
-    _, text, _ = bot.handle_update(msg("/top", chat=555), FakeStore())
-    assert "non è collegata" in text
-    _, text, _ = bot.handle_update(msg("/top"), FakeStore())
+def test_offers_are_public_and_stato_is_only_for_linked_chats():
+    _, text, _ = bot.handle_update(group("/top", chat=-555), FakeStore())
     assert "Scheda video" in text and "Ignorata" not in text and "+300 €" in text
     assert "Vista troppo tempo fa" not in text            # fuori dalla finestra dell'ultimo giro
+    _, text, _ = bot.handle_update(msg("/stato", chat=555), FakeStore())
+    assert "chi gestisce il bot" in text
     _, text, _ = bot.handle_update(msg("/stato"), FakeStore())
     assert "Offerte attive: <b>2</b>" in text and "sopra soglia: <b>2</b>" in text and "1 da verificare" in text
     assert "Ultimo giro: <b>adesso</b>" in text
@@ -82,34 +92,32 @@ def test_top_and_stato_only_in_linked_chats():
 def test_offers_stay_live_when_the_scanner_is_off():
     store = FakeStore()
     store.deals = [deal("B0A", "Scheda video", 900.0, 300.0, 45.0, seen=20)]  # PC spento da 20 ore
-    _, text, _ = bot.handle_update(msg("/top"), store)
+    _, text, _ = bot.handle_update(group("/top"), store)
     assert "Scheda video" in text
 
 
 def test_top_limit_and_warning_flag():
-    _, text, _ = bot.handle_update(msg("/top 1"), FakeStore())
+    _, text, _ = bot.handle_update(group("/top 1"), FakeStore())
     assert "Scheda video" in text and "Notebook" not in text
-    _, text, _ = bot.handle_update(msg("/top 99"), FakeStore())
+    _, text, _ = bot.handle_update(group("/top 99"), FakeStore())
     assert "Notebook terzi" in text and "⚠️" in text      # riferimento solo da altri venditori
     store = FakeStore()
     store.deals = [deal("B0C", "Notebook terzi", 1200.0, 900.0, 41.0, new_price=None), deal("B0A", "Scheda video", 900.0, 300.0, 45.0)]
-    _, text, _ = bot.handle_update(msg("/top 1"), store)
+    _, text, _ = bot.handle_update(group("/top 1"), store)
     assert "Scheda video" in text and "Notebook" not in text   # i prezzi verificati vengono prima
 
 
 def test_nuove_cerca_fasce():
-    _, text, _ = bot.handle_update(msg("/nuove"), FakeStore())
+    _, text, _ = bot.handle_update(group("/nuove"), FakeStore())
     assert "1 nuove" in text and "Scheda video" in text and "Notebook" not in text
-    _, text, _ = bot.handle_update(msg("/cerca rtx SCHEDA"), FakeStore())
+    _, text, _ = bot.handle_update(group("/cerca rtx SCHEDA"), FakeStore())
     assert "Scheda video" in text and "Notebook" not in text
-    _, text, _ = bot.handle_update(msg("/cerca <niente>"), FakeStore())
+    _, text, _ = bot.handle_update(group("/cerca <niente>"), FakeStore())
     assert "&lt;niente&gt;" in text
-    _, text, _ = bot.handle_update(msg("/cerca"), FakeStore())
+    _, text, _ = bot.handle_update(group("/cerca"), FakeStore())
     assert "/cerca rtx 5070" in text
-    _, text, _ = bot.handle_update(msg("/fasce"), FakeStore())
+    _, text, _ = bot.handle_update(group("/fasce"), FakeStore())
     assert "650 – 999 €</b>: 1" in text and "1.000 – 1.599 €</b>: 1" in text and "100 – 399" not in text
-    _, text, _ = bot.handle_update(msg("/nuove", chat=555), FakeStore())
-    assert "non è collegata" in text
 
 
 def callback(data, chat=111, chat_type="private"):
@@ -149,3 +157,133 @@ def test_public_channel_gets_no_setup_instructions(monkeypatch):
     assert bot.handle_update(added, FakeStore()) is None
     assert bot.handle_update({"channel_post": {"chat": chat, "text": "/start"}}, FakeStore()) is None
     assert bot.is_linked(-100777) and bot.is_linked(111) and not bot.is_linked(555)
+
+
+def press(data, store, chat=555, chat_type="private"):
+    return bot.handle_nav({"id": "1", "data": data, "from": {"first_name": "Ada"},
+                           "message": {"message_id": 9, "chat": {"id": chat, "type": chat_type}}}, store)
+
+
+def buttons(screen):
+    return [b for row in screen.rows for b in row]
+
+
+def test_every_button_fits_in_telegram_limits():
+    long = "è" * 200
+    store = FakeStore()
+    store.deals = [deal("B0AAAAAAAA", long, 900.0, 300.0, 45.0), deal("B0BBBBBBBB", long, 800.0, 200.0, 45.0)]
+    screen = bot.deal_screen(store, 555, "s", 0, long)
+    assert all(len(b["callback_data"].encode()) <= 64 for b in buttons(screen) if "callback_data" in b)
+    assert len(screen.caption) <= 1024
+
+
+def test_private_chat_browses_with_a_carousel():
+    store = FakeStore()
+    _, screen, _ = bot.handle_update(msg("/top", chat=555), store)
+    assert "1 di 2" in screen.caption and "Scheda video" in screen.caption and "Ignorata" not in screen.caption
+    assert "Voto Hunter" in screen.caption
+    arrows = screen.rows[0]
+    assert arrows[0]["callback_data"] == "d:top:1:" and arrows[2]["callback_data"] == "d:top:1:"     # gira in tondo
+    _, second = press(arrows[2]["callback_data"], store)
+    assert "2 di 2" in second.caption and "Notebook terzi" in second.caption and "⚠️" in second.caption
+
+
+def test_writing_a_name_searches():
+    _, screen, _ = bot.handle_update(msg("scheda video", chat=555), FakeStore())
+    assert "Scheda video" in screen.caption
+    _, screen, _ = bot.handle_update(msg("<niente>", chat=555), FakeStore())
+    assert "&lt;niente&gt;" in screen.caption
+
+
+def test_budget_and_categories_lead_to_filtered_cards():
+    store = FakeStore()
+    store.deals[1]["category"] = "Gaming"
+    _, budget = press("m:b", store)
+    target = next(b for b in buttons(budget) if b["text"].startswith("650"))
+    _, screen = press(target["callback_data"], store)
+    assert "Scheda video" in screen.caption and "1 di" not in screen.caption
+    _, categories = press("m:c", store)
+    _, screen = press(buttons(categories)[0]["callback_data"], store)
+    assert "Scheda video" in screen.caption
+
+
+def test_follow_a_price_from_the_card_and_see_it_in_the_list():
+    store = FakeStore()
+    store.deals = [deal("B0AAAAAAAA", "Scheda video", 900.0, 300.0, 45.0)]
+    _, screen, _ = bot.handle_update(msg("/seguiti", chat=555), store)
+    assert "Non segui ancora" in screen.caption
+    _, top = press("d:top:0:", store)
+    follow = next(b for b in buttons(top) if b["text"].startswith("🔔"))
+    notice, after = press(follow["callback_data"], store)
+    assert "scende" in notice and any(b["text"].startswith("🔕") for b in buttons(after))
+    assert subscribers.get(555)["watch"] == {"B0AAAAAAAA": 900.0}
+    _, screen, _ = bot.handle_update(msg("/seguiti", chat=555), store)
+    assert "Scheda video" in screen.caption
+
+
+def test_alert_settings():
+    store = FakeStore()
+    _, screen = press("a", store)
+    assert "spenti" in screen.caption
+    press("a:on", store)
+    press("a:c:Audio", store)
+    press("a:b:650", store)
+    _, screen = press("a:m:50", store)
+    assert "accesi" in screen.caption and "Audio" in screen.caption and "650 €" in screen.caption and "50%" in screen.caption
+    press("a:c:Audio", store)
+    press("a:b:0", store)
+    assert subscribers.get(555)["cats"] == [] and subscribers.get(555)["max"] is None
+
+
+def test_links_from_channel_and_site():
+    store = FakeStore()
+    store.deals = [deal("B0AAAAAAAA", "Scheda video", 900.0, 300.0, 45.0)]
+    _, screen, _ = bot.handle_update(msg("/start w_B0AAAAAAAA", chat=555), store)
+    assert "Ora lo segui" in screen.caption and "Scheda video" in screen.caption
+    assert subscribers.get(555)["watch"] == {"B0AAAAAAAA": 900.0}
+    _, screen, _ = bot.handle_update(msg("/start w_B0AAAAAAAA", chat=555), store)   # secondo clic: lo segue ancora
+    assert subscribers.get(555)["watch"] == {"B0AAAAAAAA": 900.0}
+    _, screen, _ = bot.handle_update(msg("/start avvisi", chat=555), store)
+    assert "avvisi su misura" in screen.caption
+    _, screen, _ = bot.handle_update(msg("/start boh", chat=555), store)
+    assert "Ciao" in screen.caption
+
+
+def test_buttons_do_not_work_in_groups_and_bad_data_is_refused():
+    store = FakeStore()
+    assert press("a:on", store, chat=-1009, chat_type="supergroup")[1] is None
+    assert press("x:niente", store)[1] is None
+    assert subscribers.get(-1009)["on"] is False
+
+
+def test_blocking_the_bot_forgets_the_person():
+    subscribers.update(555, lambda s: s.update(on=True))
+    upd = {"my_chat_member": {"chat": {"id": 555, "type": "private"}, "new_chat_member": {"status": "kicked"}, "date": 0}}
+    assert bot.handle_update(upd, FakeStore()) is None
+    assert subscribers.get(555)["on"] is False
+
+
+def test_show_reuses_the_uploaded_image(monkeypatch):
+    calls = []
+
+    def fake_api(method, **kw):
+        calls.append((method, kw))
+        return {"result": {"photo": [{"file_id": "piccola"}, {"file_id": "GRANDE"}]}}
+
+    monkeypatch.setattr(bot, "api", fake_api)
+    monkeypatch.setattr(bot, "_file_ids", {})
+    screen = bot.Screen("testo", [], key="k", image=lambda: b"jpeg")
+    assert bot.show(1, screen)
+    assert calls[0][0] == "sendPhoto" and "files" in calls[0][1]
+    assert bot.show(1, screen, message_id=5)
+    assert calls[1][0] == "editMessageMedia" and calls[1][1]["files"] is None
+    assert '"media": "GRANDE"' in calls[1][1]["data"]["media"]
+
+
+def test_show_falls_back_to_the_banner_without_a_photo(monkeypatch):
+    calls = []
+    monkeypatch.setattr(bot, "api", lambda method, **kw: calls.append(kw) or {"result": {}})
+    monkeypatch.setattr(bot, "_file_ids", {})
+    monkeypatch.setattr(bot, "banner", lambda: b"banner")
+    assert bot.show(1, bot.Screen("testo", [], key="k", image=lambda: None))
+    assert calls[0]["files"]["photo"][1] == b"banner"

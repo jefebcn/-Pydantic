@@ -7,8 +7,9 @@ import "./globals.css";
 const jakarta = Plus_Jakarta_Sans({ subsets: ["latin"], variable: "--font-jakarta" });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://pydantic.vercel.app"),
   title: { default: "Seconda Mano Hunter × Sander Chill House", template: "%s · Seconda Mano Hunter" },
-  description: "Gestionale per l'arbitraggio Amazon Seconda Mano: offerte, margini, magazzino e rivendite.",
+  description: "Gli affari su Amazon Seconda Mano confrontati col prezzo del nuovo, con un voto da 0 a 100 per ogni offerta.",
   robots: { index: false, follow: false },
 };
 
