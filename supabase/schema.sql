@@ -162,6 +162,19 @@ CREATE TABLE IF NOT EXISTS clicks (
 CREATE INDEX IF NOT EXISTS idx_clicks_time ON clicks (clicked_at DESC);
 
 
+-- ── 7c. BOT ONLINE: chi usa il bot e stato dello scanner, letti anche a PC spento ─
+CREATE TABLE IF NOT EXISTS bot_users (
+  chat_id     TEXT PRIMARY KEY,
+  prefs       JSONB NOT NULL DEFAULT '{}',
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE TABLE IF NOT EXISTS app_state (
+  key         TEXT PRIMARY KEY,
+  value       JSONB NOT NULL,
+  updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+
 -- ── 8. SICUREZZA ────────────────────────────────────────────────────
 -- Nessun accesso pubblico: scanner e dashboard usano la service role key lato server.
 ALTER TABLE settings        ENABLE ROW LEVEL SECURITY;
@@ -170,6 +183,8 @@ ALTER TABLE price_snapshots ENABLE ROW LEVEL SECURITY;
 ALTER TABLE alerts          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE clicks          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE bot_users       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE app_state       ENABLE ROW LEVEL SECURITY;
 
 
 -- ── 9. MANUTENZIONE (facoltativa, da lanciare a mano ogni tanto) ────

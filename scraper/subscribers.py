@@ -1,4 +1,5 @@
-"""Chi usa il bot in privato: avvisi su misura e prodotti seguiti. Solo su questo PC, in scraper/.subscribers.json.
+"""Chi usa il bot in privato: avvisi su misura e prodotti seguiti. Su Supabase (tabella bot_users) con il bot online,
+altrimenti solo su questo PC, in scraper/.subscribers.json.
 
 {chat: {"on": bool, "cats": [categorie, vuoto = tutte], "max": budget o None, "margin": min %,
         "sent": {asin: {"price", "ts"}}, "watch": {asin: prezzo a cui avvisare sotto},
@@ -31,11 +32,64 @@ def _blank() -> dict:
     return {"on": False, "cats": [], "max": None, "margin": DEFAULT_MARGIN, "sent": {}, "watch": {}}
 
 
+_store = None
+
+
+def _db():
+    global _store
+    if _store is None:
+        from .store import Store
+        _store = Store()
+    return _store
+
+
 def _load() -> dict:
+    """Tutte le persone: {chat: preferenze}."""
+    if config.BOT_ONLINE:
+        return {r["chat_id"]: r["prefs"] for r in _db()._req("GET", "bot_users?select=chat_id,prefs&limit=10000") or []}
+    return _load_file()
+
+
+def _load_file() -> dict:
     try:
         return json.loads(config.SUBSCRIBERS_FILE.read_text())
     except (FileNotFoundError, json.JSONDecodeError):
         return {}
+
+
+def _one(chat) -> dict:
+    if config.BOT_ONLINE:
+        rows = _db()._req("GET", f"bot_users?chat_id=eq.{chat}&select=prefs")
+        return rows[0]["prefs"] if rows else {}
+    return _load_file().get(str(chat), {})
+
+
+def _put(chat, sub: dict) -> None:
+    if config.BOT_ONLINE:
+        _db()._req("POST", "bot_users?on_conflict=chat_id", json={"chat_id": str(chat), "prefs": sub},
+                   headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+        return
+    data = _load_file()
+    data[str(chat)] = sub
+    _save(data)
+
+
+def _drop(chat) -> None:
+    if config.BOT_ONLINE:
+        _db()._req("DELETE", f"bot_users?chat_id=eq.{chat}", headers={"Prefer": "return=minimal"})
+        return
+    data = _load_file()
+    if data.pop(str(chat), None) is not None:
+        _save(data)
+
+
+def migrate_file() -> int:
+    """Una volta sola, passando al bot online: porta su Supabase le scelte salvate su questo PC."""
+    people = _load_file()
+    for chat, sub in people.items():
+        _db()._req("POST", "bot_users?on_conflict=chat_id", json={"chat_id": chat, "prefs": sub},
+                   headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+    return len(people)
 
 
 def _save(data: dict) -> None:
@@ -50,17 +104,15 @@ def _save(data: dict) -> None:
 
 def get(chat) -> dict:
     with _lock:
-        return {**_blank(), **_load().get(str(chat), {})}
+        return {**_blank(), **_one(chat)}
 
 
 def update(chat, change) -> dict:
     """Applica `change(sub)` alle preferenze della chat e le salva."""
     with _lock:
-        data = _load()
-        sub = {**_blank(), **data.get(str(chat), {})}
+        sub = {**_blank(), **_one(chat)}
         change(sub)
-        data[str(chat)] = sub
-        _save(data)
+        _put(chat, sub)
         return sub
 
 
@@ -86,9 +138,7 @@ def usage(now: float) -> dict:
 def forget(chat) -> None:
     """La persona ha bloccato il bot: non le si scrive più e non si tiene nulla."""
     with _lock:
-        data = _load()
-        if data.pop(str(chat), None) is not None:
-            _save(data)
+        _drop(chat)
 
 
 def toggle_watch(chat, asin: str, price) -> bool | None:

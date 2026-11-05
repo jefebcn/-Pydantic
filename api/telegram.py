@@ -1,4 +1,7 @@
-"""Prova temporanea: Vercel fa girare Python accanto al sito? Pillow, scraper e foto Amazon sono disponibili?"""
+"""Il bot Telegram su Vercel: risponde anche con il PC spento. Telegram manda qui ogni messaggio e pulsante (webhook).
+Tutta la logica sta in scraper/bot.py. Si attiva con: python -m scraper.main --bot-online
+"""
+import hmac
 import json
 import sys
 from http.server import BaseHTTPRequestHandler
@@ -6,34 +9,39 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from scraper import bot, config  # noqa: E402
+from scraper.store import Store  # noqa: E402
 
-def check() -> dict:
-    out = {"python": sys.version.split()[0]}
-    try:
-        import PIL
-        out["pillow"] = PIL.__version__
-    except Exception as e:
-        out["pillow"] = repr(e)[:120]
-    try:
-        from scraper import config
-        out["scraper"] = bool(config.ROOT.exists())
-        out["avatar"] = (config.ROOT / "assets" / "bot_avatar.jpg").exists()
-    except Exception as e:
-        out["scraper"] = repr(e)[:200]
-    try:
-        import requests
-        r = requests.get("https://m.media-amazon.com/images/I/71+E9IumwyL._AC_SL1000_.jpg", timeout=10)
-        out["foto"] = [r.status_code, len(r.content)]
-    except Exception as e:
-        out["foto"] = repr(e)[:120]
-    out["font"] = [str(p) for p in Path("/usr/share/fonts").rglob("*.ttf")][:3] if Path("/usr/share/fonts").exists() else []
-    return out
+_store = None   # resta fra una richiesta e l'altra: serve alla memoria breve delle offerte
+
+
+def get_store() -> Store:
+    global _store
+    if _store is None:
+        _store = Store()
+    return _store
 
 
 class handler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        body = json.dumps(check()).encode()
-        self.send_response(200)
+    def _answer(self, code: int, body: dict) -> None:
+        self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
-        self.wfile.write(body)
+        self.wfile.write(json.dumps(body).encode())
+
+    def do_GET(self):
+        """Controllo prima di attivare il bot: dice solo cosa c'è, nessun valore."""
+        parts = {"token": bool(config.TELEGRAM_BOT_TOKEN), "database": bool(config.SUPABASE_URL and config.SUPABASE_SERVICE_ROLE_KEY),
+                 "online": config.BOT_ONLINE, "chat": bool(config.TELEGRAM_CHAT_ID), "site": bool(config.DASHBOARD_URL)}
+        self._answer(200, {"ready": all(parts.values()), **parts})
+
+    def do_POST(self):
+        secret = self.headers.get("X-Telegram-Bot-Api-Secret-Token", "")
+        if not config.TELEGRAM_BOT_TOKEN or not hmac.compare_digest(secret, bot.webhook_secret()):
+            return self._answer(401, {"error": "non autorizzato"})
+        update = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+        try:
+            bot.process_update(update, get_store())
+        except Exception as e:  # con un errore Telegram riproverebbe all'infinito: si registra e si va avanti
+            print(f"errore nell'aggiornamento {update.get('update_id')}: {e!r}", flush=True)
+        self._answer(200, {"ok": True})

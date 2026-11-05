@@ -87,8 +87,13 @@ def load_state() -> dict:
         return {}
 
 
-def save_state(state: dict) -> None:
+def save_state(state: dict, store=None) -> None:
     write_json(config.STATE_FILE, state)
+    if store and config.BOT_ONLINE:   # il bot su Vercel non vede i file di questo PC
+        try:
+            store.set_state("scanner", {**state, "speed": config.SCAN_SPEED})
+        except Exception as e:
+            log(f"non riesco a salvare lo stato su Supabase: {e!r}")
 
 
 def load_published() -> dict:
@@ -233,10 +238,21 @@ def main() -> None:
     ap.add_argument("--speed", choices=config.SPEED_ORDER, help="profilo massimo (sovrascrive SCAN_SPEED)")
     ap.add_argument("--telegram-setup", action="store_true",
                     help="imposta nome, foto, biografia e comandi del bot Telegram ed esce")
+    ap.add_argument("--bot-online", action="store_true", help="porta il bot su Vercel: risponde anche a PC spento")
+    ap.add_argument("--bot-offline", action="store_true", help="riporta il bot su questo PC")
     a = ap.parse_args()
     if a.telegram_setup:
         for label, result in bot.set_profile(config.ROOT / "assets" / "bot_avatar.jpg").items():
             print(f"{label:<15} {'ok' if result is True else result}")
+        return
+    if a.bot_online or a.bot_offline:
+        from .store import Store
+        if a.bot_offline:
+            bot.go_offline()
+            print("Webhook tolto. Togli BOT_ONLINE=1 da scraper/.env e riavvia lo scanner.")
+        else:
+            config.BOT_ONLINE = True
+            print("\n".join(bot.go_online(Store())))
         return
     if a.debug:
         config.DEBUG = True
@@ -264,7 +280,9 @@ def main() -> None:
 
     from .store import Store
     store = Store()
-    if config.TELEGRAM_BOT_TOKEN:
+    if config.BOT_ONLINE:
+        log("bot Telegram: gira su Vercel, qui solo avvisi e post")
+    elif config.TELEGRAM_BOT_TOKEN:
         threading.Thread(target=bot.run_forever, args=(store,), daemon=True, name="telegram-bot").start()
         log("bot Telegram: comandi " + " ".join(f"/{c}" for c, _ in bot.COMMANDS) + " attivi")
     state = load_state()
@@ -296,7 +314,7 @@ def main() -> None:
         except CaptchaError as e:
             state["search_pos"] = search_pos  # le ricerche di questo giro si rifanno al prossimo
             pause_min = pace.on_block(state, configured)
-            save_state(state)
+            save_state(state, store)
             client = None  # dopo un blocco si riparte con una sessione nuova
             new_level = pace.current_level(state, configured)
             log(f"⚠️  {e} — pausa {pause_min} min, poi velocità '{new_level}'")
@@ -320,7 +338,7 @@ def main() -> None:
                 except Exception as e:  # non deve mai fermare lo scanner
                     log(f"errore nel riepilogo del giorno: {e!r}")
         pace.schedule_next(state, prof["cycle_minutes"])
-        save_state(state)
+        save_state(state, store)
         if a.once:
             return
 

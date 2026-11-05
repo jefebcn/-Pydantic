@@ -318,3 +318,61 @@ def test_stato_survives_a_missing_clicks_table(monkeypatch):
     store._req = broken
     _, text, _ = bot.handle_update(msg("/stato"), store)
     assert "da attivare" in text and "Offerte attive" in text
+
+
+def test_process_update_answers_and_skips_old_messages(monkeypatch):
+    sent = []
+    monkeypatch.setattr(bot, "post", lambda method, chat, payload, topic=None: sent.append(payload["text"]) or True)
+    monkeypatch.setattr(bot, "show", lambda chat, screen, message_id=None: sent.append(screen.caption) or True)
+    now = int(__import__("time").time())
+    fresh = group("/top")
+    fresh["message"]["date"] = now
+    bot.process_update(fresh, FakeStore())
+    assert "Scheda video" in sent[-1]
+    stale = msg("/start", chat=555)
+    stale["message"]["date"] = now - bot.OLD_UPDATE_S - 5
+    bot.process_update(stale, FakeStore())
+    assert len(sent) == 1
+    new = msg("/start", chat=555)
+    new["message"]["date"] = now
+    bot.process_update(new, FakeStore())
+    assert "Ciao" in sent[-1]
+
+
+def test_a_broken_command_still_gets_an_answer(monkeypatch):
+    sent = []
+    monkeypatch.setattr(bot, "post", lambda method, chat, payload, topic=None: sent.append((chat, payload["text"])) or True)
+    monkeypatch.setattr(bot, "handle_update", lambda u, s: 1 / 0)
+    update = group("/top")
+    update["message"]["date"] = int(__import__("time").time())
+    bot.process_update(update, FakeStore())
+    assert sent[0][0] == "-1009" and "Errore" in sent[0][1]
+
+
+def test_home_warns_when_prices_are_old():
+    store = FakeStore()
+    store.deals = [deal("B0AAAAAAAA", "Scheda video", 900.0, 300.0, 45.0, seen=3)]
+    assert "verificali su Amazon" in bot.home_screen(store).caption
+    fresh = FakeStore()
+    fresh.deals = [deal("B0AAAAAAAA", "Scheda video", 900.0, 300.0, 45.0)]
+    assert "verificali" not in bot.home_screen(fresh).caption
+
+
+def test_online_status_reads_the_state_from_the_database(monkeypatch):
+    monkeypatch.setattr(config, "BOT_ONLINE", True)
+    monkeypatch.setattr(bot, "api", lambda method, **kw: None)
+    monkeypatch.setattr(subscribers, "_store", type("R", (), {"_req": lambda self, *a, **k: []})())
+    store = FakeStore()
+    future = __import__("time").time() + 1800
+    store.get_state = lambda key: {"level": "lento", "speed": "normale", "resume_at": future}
+    _, text, _ = bot.handle_update(msg("/stato"), store)
+    assert "riparte tra <b>30 min</b>" in text and "massima normale" in text
+
+
+def test_webhook_secret_comes_from_the_token_and_is_valid_for_telegram(monkeypatch):
+    import re
+    monkeypatch.setattr(config, "TELEGRAM_BOT_TOKEN", "123:abc")
+    first = bot.webhook_secret()
+    assert re.fullmatch(r"[A-Za-z0-9_-]{1,256}", first) and "abc" not in first
+    monkeypatch.setattr(config, "TELEGRAM_BOT_TOKEN", "123:def")
+    assert bot.webhook_secret() != first

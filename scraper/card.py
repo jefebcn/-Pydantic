@@ -4,7 +4,7 @@ from __future__ import annotations
 import io
 import re
 import unicodedata
-from pathlib import Path
+from functools import lru_cache
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -23,21 +23,19 @@ SKY, LILAC, MINT, GAIN = "#dceafb", "#e3dcf6", "#d6efdc", "#2f9e63"
 BRAND = "SECOND HAND HUNTER"
 KEEP_CHARS = "€–—‘’“”…°²³×"
 
-FONT_DIRS = [Path("C:/Windows/Fonts"), Path("/usr/share/fonts/truetype/dejavu")]
-FONTS = {  # il primo trovato; DejaVu per chi fa girare lo scanner su Linux
-    "regular": ["segoeui.ttf", "arial.ttf", "DejaVuSans.ttf"],
-    "semibold": ["seguisb.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"],
-    "bold": ["segoeuib.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"],
-    "black": ["seguibl.ttf", "arialbd.ttf", "DejaVuSans-Bold.ttf"],
-}
+# Il font del sito, incluso nel progetto: su Vercel non ce ne sono altri. Licenza SIL OFL (scraper/assets/fonts/LICENZA.txt).
+FONT_DIR = config.ROOT / "assets" / "fonts"
+FONTS = {"regular": "PlusJakartaSans-Regular.ttf", "semibold": "PlusJakartaSans-SemiBold.ttf",
+         "bold": "PlusJakartaSans-Bold.ttf", "black": "PlusJakartaSans-ExtraBold.ttf"}
 
 
 def font(weight: str, size: int) -> ImageFont.FreeTypeFont:
-    for name in FONTS[weight]:
-        for folder in FONT_DIRS:
-            if (folder / name).exists():
-                return ImageFont.truetype(str(folder / name), size * S)
-    return ImageFont.load_default(size * S)
+    return _load_font(weight, size * S)
+
+
+@lru_cache(maxsize=64)
+def _load_font(weight: str, pixels: int) -> ImageFont.FreeTypeFont:
+    return ImageFont.truetype(str(FONT_DIR / FONTS[weight]), pixels)
 
 
 def clean_title(text: str) -> str:

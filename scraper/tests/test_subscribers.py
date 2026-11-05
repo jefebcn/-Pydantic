@@ -108,3 +108,42 @@ def test_digest_and_banner_are_jpegs():
     for out in (render_banner(), render_digest([long, DEAL, {**DEAL, "asin": "NOFOTO"}], {DEAL["asin"]: photo.getvalue()}, "5 novembre")):
         img = Image.open(io.BytesIO(out))
         assert img.format == "JPEG" and img.size == (W, H)
+
+
+class FakeRest:
+    """Risponde come PostgREST sulle tabelle usate dal bot."""
+
+    def __init__(self):
+        self.rows = {}
+
+    def _req(self, method, path, json=None, headers=None):
+        if method == "POST":
+            self.rows[json["chat_id"]] = json["prefs"]
+            return None
+        if method == "DELETE":
+            self.rows.pop(path.split("eq.")[1], None)
+            return None
+        if "chat_id=eq." in path:
+            chat = path.split("eq.")[1].split("&")[0]
+            return [{"prefs": self.rows[chat]}] if chat in self.rows else []
+        return [{"chat_id": c, "prefs": v} for c, v in self.rows.items()]
+
+
+def test_online_preferences_live_in_the_database(monkeypatch):
+    rest = FakeRest()
+    monkeypatch.setattr(subscribers, "_store", rest)
+    monkeypatch.setattr(config, "BOT_ONLINE", True)
+    subscribers.update(7, lambda s: s.update(on=True, margin=50))
+    assert rest.rows["7"]["margin"] == 50 and subscribers.get(7)["on"] is True
+    assert not config.SUBSCRIBERS_FILE.exists()                                     # niente file su Vercel
+    subscribers.toggle_watch(8, "A", 10)
+    assert subscribers.usage(NOW)["people"] == 2
+    subscribers.forget(7)
+    assert "7" not in rest.rows and subscribers.get(7)["on"] is False
+
+
+def test_moving_online_brings_the_choices_along(monkeypatch):
+    subscribers.update(7, lambda s: s.update(on=True))
+    rest = FakeRest()
+    monkeypatch.setattr(subscribers, "_store", rest)
+    assert subscribers.migrate_file() == 1 and rest.rows["7"]["on"] is True

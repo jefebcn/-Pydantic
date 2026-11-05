@@ -57,7 +57,9 @@ Negli avvisi in chat privata ci sono anche i pulsanti **☆ Interessante** e **�
 
 Il segno ⚠️ (sul sito "da verificare") vuol dire che il prezzo del nuovo può essere gonfiato: viene solo da altri venditori, oppure uno di loro vende a meno di Amazon. In quel caso il margine reale può essere più basso.
 
-**Chi usa il bot in privato** non deve configurare nulla: `/start` apre un menu con le offerte da sfogliare, i filtri per budget e categoria, gli avvisi su misura e i prodotti di cui seguire il prezzo. Le preferenze restano solo sul PC dello scanner, in `scraper/.subscribers.json`: se il file si perde, chi usa il bot deve rifare le sue scelte.
+**Chi usa il bot in privato** non deve configurare nulla: `/start` apre un menu con le offerte da sfogliare, i filtri per budget e categoria, gli avvisi su misura e i prodotti di cui seguire il prezzo. Le preferenze stanno su Supabase. A PC spento il bot risponde con le ultime offerte trovate, ma non ne cerca di nuove.
+
+**Bot online:** esegui `supabase/schema.sql`, aggiungi su Vercel `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`, ripubblica e lancia `python -m scraper.main --bot-online`. Poi metti `BOT_ONLINE=1` in `scraper/.env` e riavvia lo scanner. Per tornare al PC: `python -m scraper.main --bot-offline` e togli la riga.
 
 **Canale pubblico:** aggiungi il bot come amministratore del canale, metti l'ID (te lo dà `/chatid` scritto nel canale) in `TELEGRAM_CHANNEL_ID` e riavvia lo scanner. Il canale riceve solo le offerte con prezzo verificato, una volta sola (di nuovo se il prezzo cala o dopo 7 giorni), senza pulsanti ☆ e ✕ né messaggi di servizio. La descrizione del canale si imposta con `python -m scraper.main --telegram-setup`.
 

@@ -10,6 +10,7 @@ Le offerte sono le stesse del sito pubblico: ignorate e già acquistate restano 
 """
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import re
@@ -45,6 +46,8 @@ OWNER_COMMANDS = COMMANDS + [("stato", "Stato dello scanner"), ("chatid", "ID di
 # (a velocità lenta il giro completo dura 4 ore) e a PC spento non sparisce tutto. Come in app/api/deals/route.ts.
 LIVE_HOURS = 6
 LIVE_CACHE_S = 30        # ogni pulsante rilegge le offerte: bastano dati di pochi secondi fa
+STALE_HOURS = 2          # oltre questo tempo senza controlli si avvisa che i prezzi possono essere vecchi (come SCANNER_STALE_MS)
+OLD_UPDATE_S = 600       # un messaggio arrivato troppo tempo fa non aspetta più una risposta
 # Le stesse fasce del sito (lib/format.ts): estremo superiore escluso.
 BANDS = [("100 – 399 €", 0, 400), ("400 – 649 €", 400, 650), ("650 – 999 €", 650, 1000),
          ("1.000 – 1.599 €", 1000, 1600), ("1.600 – 3.000 €", 1600, 3000.01), ("Oltre 3.000 €", 3000.01, float("inf"))]
@@ -174,15 +177,23 @@ def status_text(store) -> str:
     hot = [d for d in live if float(d["margin_pct"]) >= margin_min and float(d["profit_eur"]) >= profit_min]
     doubtful = sum(1 for d in hot if ref_warning(d))
     seen = [_when(d["last_seen_at"]) for d in live] + ([_when(last[0]["checked_at"])] if last else [])
-    try:
-        state = json.loads(config.STATE_FILE.read_text())
-    except (FileNotFoundError, ValueError):
-        state = {}
+    state = scanner_state(store)
     pause = ""
-    if pace.wait_seconds(state):
-        pause = f"⏸ In pausa dopo un blocco di Amazon: riparte alle <b>{datetime.fromtimestamp(state['resume_at']):%H:%M}</b>\n"
+    wait = pace.wait_seconds(state)
+    if wait:
+        pause = f"⏸ In pausa dopo un blocco di Amazon: riparte tra <b>{max(1, round(wait / 60))} min</b>\n"
     best = max((float(d["margin_pct"]) for d in live), default=0)
     return "\n\n".join([_scanner_text(pause, seen, state, live, hot, doubtful, best, margin_min, profit_min), audience_text(store)])
+
+
+def scanner_state(store) -> dict:
+    """Ritmo e pause dello scanner. Con il bot online li legge da Supabase, dove lo scanner li scrive a ogni giro."""
+    try:
+        if config.BOT_ONLINE:
+            return store.get_state("scanner")
+        return json.loads(config.STATE_FILE.read_text())
+    except (FileNotFoundError, ValueError, RuntimeError):
+        return {}
 
 
 def audience_text(store) -> str:
@@ -193,10 +204,10 @@ def audience_text(store) -> str:
              f"Bot: <b>{use['people']}</b> persone, {use['active']} attive in 7 giorni",
              f"Avvisi accesi: <b>{use['alerts_on']}</b> · prodotti seguiti: <b>{use['watching']}</b>",
              f"Premium: 5 € <b>{premium[5]}</b> · 15 € <b>{premium[15]}</b> · non pagherei <b>{premium[0]}</b>"]
-    if config.TELEGRAM_CHANNEL_ID:
-        members = api("getChatMemberCount", json={"chat_id": config.TELEGRAM_CHANNEL_ID})
-        if members:
-            lines.append(f"Canale: <b>{members.get('result')}</b> iscritti")
+    channel = config.TELEGRAM_CHANNEL_ID or f"@{config.TELEGRAM_CHANNEL_URL.rsplit('/', 1)[-1]}"  # su Vercel basta il nome
+    members = api("getChatMemberCount", json={"chat_id": channel})
+    if members:
+        lines.append(f"Canale: <b>{members.get('result')}</b> iscritti")
     since = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%dT%H:%M:%SZ")
     try:
         clicks = store._req("GET", f"clicks?select=source&clicked_at=gte.{since}&limit=10000") or []
@@ -217,7 +228,7 @@ def _scanner_text(pause, seen, state, live, hot, doubtful, best, margin_min, pro
         "📡 <b>Stato scanner</b>\n"
         f"{pause}"
         f"Ultimo giro: <b>{ago_text(max(seen)) if seen else 'mai'}</b>\n"
-        f"Velocità: <b>{pace.current_level(state, config.SCAN_SPEED)}</b> (massima {config.SCAN_SPEED})\n"
+        f"Velocità: <b>{pace.current_level(state, state.get('speed', config.SCAN_SPEED))}</b> (massima {state.get('speed', config.SCAN_SPEED)})\n"
         f"Offerte attive: <b>{len(live)}</b> · sopra soglia: <b>{len(hot)}</b>"
         f"{f' (⚠️ {doubtful} da verificare)' if doubtful else ''}\n"
         f"Miglior margine: <b>{best:.0f}%</b>\n"
@@ -308,6 +319,8 @@ def home_screen(store, first_name: str = "") -> Screen:
         last = max(_when(d["last_seen_at"]) for d in live)
         stats = (f"🔥 <b>{len(verified)}</b> offerte col prezzo verificato · la migliore <b>+{eur(best, 0)}</b>\n"
                  f"📡 Ultimo controllo: {ago_text(last)}")
+        if datetime.now(timezone.utc) - last > timedelta(hours=STALE_HOURS):
+            stats += "\n⚠️ Non controllo i prezzi da un po': verificali su Amazon prima di comprare."
     else:
         stats = "Le offerte stanno arrivando: riprova tra poco."
     rows = [
@@ -729,29 +742,68 @@ def _answer_callback(cb: dict, store) -> None:
                                         "reply_markup": {"inline_keyboard": rows}})
 
 
+ALLOWED_UPDATES = ["message", "channel_post", "my_chat_member", "callback_query"]
+
+
+def process_update(update: dict, store, oldest: float | None = None) -> None:
+    """Un aggiornamento di Telegram, comunque sia arrivato (webhook su Vercel o lettura dal PC)."""
+    if update.get("callback_query"):
+        return _answer_callback(update["callback_query"], store)
+    body = update.get("message") or update.get("channel_post") or update.get("my_chat_member") or {}
+    if body.get("date", time.time()) < (oldest if oldest is not None else time.time() - OLD_UPDATE_S):
+        return None
+    try:
+        out = handle_update(update, store)
+    except Exception as e:  # un errore su un comando non deve fermare il bot
+        out = (str(body.get("chat", {}).get("id")), f"⚠️ Errore: {html.escape(str(e))[:200]}", None)
+    if out and isinstance(out[1], Screen):
+        show(out[0], out[1])
+    elif out:
+        post("sendMessage", out[0], {"text": out[1], "link_preview_options": {"is_disabled": True}}, out[2])
+
+
 def run_forever(store) -> None:
-    """Long polling dei comandi; ignora i messaggi arrivati più di 2 minuti prima dell'avvio."""
+    """Bot sul PC: legge i comandi da Telegram; ignora i messaggi arrivati più di 2 minuti prima dell'avvio."""
     started, offset = time.time(), None
     url = f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/getUpdates"
-    allowed = json.dumps(["message", "channel_post", "my_chat_member", "callback_query"])
     while True:
         try:
-            r = requests.get(url, params={"timeout": 50, "offset": offset, "allowed_updates": allowed}, timeout=65).json()
+            r = requests.get(url, params={"timeout": 50, "offset": offset, "allowed_updates": json.dumps(ALLOWED_UPDATES)},
+                             timeout=65).json()
+            if not r.get("ok"):   # es. webhook attivo: niente tentativi a raffica
+                time.sleep(15)
             for u in r.get("result", []):
                 offset = u["update_id"] + 1
-                if u.get("callback_query"):
-                    _answer_callback(u["callback_query"], store)
-                    continue
-                body = u.get("message") or u.get("channel_post") or u.get("my_chat_member") or {}
-                if body.get("date", started) < started - 120:
-                    continue
-                try:
-                    out = handle_update(u, store)
-                except Exception as e:  # un errore su un comando non deve fermare il bot
-                    out = (str(body.get("chat", {}).get("id")), f"⚠️ Errore: {html.escape(str(e))[:200]}", None)
-                if out and isinstance(out[1], Screen):
-                    show(out[0], out[1])
-                elif out:
-                    post("sendMessage", out[0], {"text": out[1], "link_preview_options": {"is_disabled": True}}, out[2])
+                process_update(u, store, oldest=started - 120)
         except Exception:
             time.sleep(15)
+
+
+# ── Bot online su Vercel ────────────────────────────────────────────
+
+def webhook_secret() -> str:
+    """Parola segreta con cui Telegram si fa riconoscere da api/telegram.py. Deriva dal token: nessuna variabile in più."""
+    return hashlib.sha256(f"webhook:{config.TELEGRAM_BOT_TOKEN}".encode()).hexdigest()
+
+
+def go_online(store) -> list[str]:
+    """Porta il bot su Vercel. Si ferma al primo problema, senza cambiare nulla su Telegram."""
+    site = config.DASHBOARD_URL.rstrip("/")
+    if not site:
+        raise SystemExit("Manca DASHBOARD_URL in scraper/.env")
+    store._req("GET", "bot_users?select=chat_id&limit=1")   # se manca la tabella, si ferma qui
+    store._req("GET", "app_state?select=key&limit=1")
+    ready = requests.get(f"{site}/api/telegram", timeout=30).json()
+    if not ready.get("ready"):
+        raise SystemExit(f"Vercel non è pronto: {ready}. Controlla TELEGRAM_BOT_TOKEN su Vercel e ripubblica.")
+    moved = subscribers.migrate_file()
+    r = requests.post(f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/setWebhook", timeout=30,
+                      json={"url": f"{site}/api/telegram", "secret_token": webhook_secret(), "allowed_updates": ALLOWED_UPDATES}).json()
+    if not r.get("ok"):
+        raise SystemExit(f"Telegram ha rifiutato il webhook: {r.get('description')}")
+    return [f"preferenze portate su Supabase: {moved}", "webhook attivo", "ora metti BOT_ONLINE=1 in scraper/.env e riavvia lo scanner"]
+
+
+def go_offline() -> None:
+    """Riporta il bot sul PC (togli anche BOT_ONLINE=1 da scraper/.env). I messaggi in attesa restano."""
+    requests.post(f"https://api.telegram.org/bot{config.TELEGRAM_BOT_TOKEN}/deleteWebhook", timeout=30).raise_for_status()

@@ -8,7 +8,8 @@ export const ADMIN_COOKIE = "smh_admin";
 export const ADMIN_MAX_AGE = 60 * 60 * 24 * 30; // 30 giorni
 
 const ADMIN_PAGES = ["/magazzino", "/impostazioni"];
-const PUBLIC_API = ["/api/login", "/api/logout"];
+// /api/telegram è il bot (api/telegram.py): si fa riconoscere con la parola segreta di Telegram
+const PUBLIC_API = ["/api/telegram", "/api/login", "/api/logout"];
 
 export async function adminToken(password: string): Promise<string> {
   const enc = new TextEncoder();

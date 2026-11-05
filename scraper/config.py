@@ -110,9 +110,12 @@ SUPABASE_SERVICE_ROLE_KEY = (os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 TELEGRAM_CHANNEL_ID = os.getenv("TELEGRAM_CHANNEL_ID", "").strip()  # canale pubblico: solo offerte con prezzo verificato
+# 1 = il bot gira su Vercel (api/telegram.py): il PC non legge i messaggi e le preferenze stanno su Supabase
+BOT_ONLINE = os.getenv("BOT_ONLINE", "").strip() == "1" or bool(os.getenv("VERCEL"))
 TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "SecondHandHunter_Bot")
 TELEGRAM_CHANNEL_URL = os.getenv("TELEGRAM_CHANNEL_URL", "https://t.me/secondhandhunters")
-DASHBOARD_URL = os.getenv("DASHBOARD_URL", "")
+_vercel_url = os.getenv("VERCEL_PROJECT_PRODUCTION_URL", "")
+DASHBOARD_URL = os.getenv("DASHBOARD_URL") or (f"https://{_vercel_url}" if _vercel_url else "")
 
 CACHE_FILE = ROOT / ".cache.json"
 STATE_FILE = ROOT / ".state.json"   # ritmo attuale, blocchi, posizione nella rotazione delle ricerche

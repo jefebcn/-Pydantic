@@ -56,6 +56,14 @@ class Store:
         rows = self._req("GET", f"deals_v?asin=eq.{asin}&select=*")
         return rows[0] if rows else None
 
+    def get_state(self, key: str) -> dict:
+        rows = self._req("GET", f"app_state?key=eq.{key}&select=value")
+        return rows[0]["value"] if rows else {}
+
+    def set_state(self, key: str, value: dict) -> None:
+        self._req("POST", "app_state?on_conflict=key", json={"key": key, "value": value},
+                  headers={"Prefer": "resolution=merge-duplicates,return=minimal"})
+
     def settings(self) -> dict:
         rows = self._req("GET", "settings?id=eq.1&select=*")
         return rows[0] if rows else {}
