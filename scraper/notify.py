@@ -122,7 +122,8 @@ def send_deal(d: dict, discount_pct: float, previous: float | None = None) -> bo
     for chat, topic in parse_chats(config.TELEGRAM_CHAT_ID):
         # in un gruppo chiunque potrebbe premere: ★ e ✕ si danno solo nelle chat private collegate
         markup = {"inline_keyboard": deal_buttons(d, triage=not chat.startswith("-"))}
-        sent = bool(_deliver(chat, topic, d, caption, card, {"reply_markup": markup})) or sent
+        extra = {"reply_markup": markup, "disable_notification": is_quiet_hour(datetime.now().hour)}
+        sent = bool(_deliver(chat, topic, d, caption, card, extra)) or sent
     return sent
 
 
