@@ -1,0 +1,4 @@
+# Solo per il bot su Vercel (api/telegram.py). Lo scanner sul PC usa scraper/requirements.txt.
+requests>=2.32.0
+python-dotenv>=1.0.0
+pillow>=11
